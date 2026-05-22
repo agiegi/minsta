@@ -15,9 +15,23 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+import urllib.request
+import urllib.parse
+import urllib.error
 import random
 import bcrypt
 import asyncio
+import json
+import os
+
+# .env ファイルから環境変数を読み込む。
+# APIキーなどの秘密情報はコードに直接書かず、ここから取得する。
+load_dotenv()
+
+# Google Books API キー。.env に「GOOGLE_BOOKS_API_KEY=...」の形式で設定する。
+# 値はサーバー側にのみ存在し、ブラウザには一切渡らない。
+GOOGLE_BOOKS_API_KEY = os.environ.get("GOOGLE_BOOKS_API_KEY", "")
 
 
 # --- 時刻ユーティリティ ---
@@ -753,3 +767,41 @@ async def toggle_reaction(message_id: int, data: dict, db: Session = Depends(get
 
     await manager.broadcast_to_group(msg.group_id, "update")
     return {"message": "Reaction toggled"}
+
+
+# ✨ セキュリティ改良: 書籍検索のサーバー側プロキシ。
+# 従来は user.html に Google Books API キーを直書きしていたため、ブラウザから
+# キーが丸見えだった。検索をサーバーが代行することで、キーは .env（サーバー）に
+# のみ存在し、ブラウザには一切渡らなくなる。
+@app.get("/api/books/search")
+def search_books(q: str, startIndex: int = 0):
+    if not GOOGLE_BOOKS_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="書籍検索APIキーが未設定です（.env の GOOGLE_BOOKS_API_KEY を確認してください）",
+        )
+    params = urllib.parse.urlencode(
+        {
+            "q": q,
+            "maxResults": 20,
+            "startIndex": startIndex,
+            "key": GOOGLE_BOOKS_API_KEY,
+        }
+    )
+    url = f"https://www.googleapis.com/books/v1/volumes?{params}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "minsta"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            raise HTTPException(
+                status_code=429,
+                detail="検索の上限に達しました。少し待ってからお試しください。",
+            )
+        raise HTTPException(status_code=502, detail="書籍検索に失敗しました")
+    except Exception:
+        raise HTTPException(status_code=502, detail="書籍検索に失敗しました")
+
+    # フロントエンドが使用する items のみを返す。
+    return {"items": data.get("items", [])}

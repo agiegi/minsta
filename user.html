@@ -1627,7 +1627,9 @@
             }
 
             try {
-                const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&startIndex=${currentSearchStartIndex}&key=AIzaSyCz4zfzkPoc2KME3axthoOrR_3EPqGjwlQ`;
+                // 書籍検索はサーバー側プロキシ経由で行う。
+                // APIキーはサーバーの .env にのみ存在し、ブラウザには出てこない。
+                const url = `${API_URL}/api/books/search?q=${encodeURIComponent(query)}&startIndex=${currentSearchStartIndex}`;
                 const res = await fetch(url);
 
                 if (res.status === 429) {
@@ -1691,16 +1693,43 @@
         }
 
 
+        // ✨ 変更: バックグラウンド再生中にロック画面やメディア通知へ表示される
+        // アイコンを、アプリ本体（manifest.json）と同じ双葉「🌱」に統一する。
+        // 従来は外部サイトの画像URLを参照していたが、絵文字を描いた画像を内部生成し
+        // 外部依存をなくす（オフラインでも正しく表示される）。
+        let appIconDataUrl = null;
+        function getAppIconDataUrl() {
+            if (appIconDataUrl) return appIconDataUrl;
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.font = '384px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🌱', 256, 300);
+                appIconDataUrl = canvas.toDataURL('image/png');
+            } catch (e) {
+                appIconDataUrl = null;
+            }
+            return appIconDataUrl;
+        }
+
         function setupMediaSession(title) {
             if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({
+                const icon = getAppIconDataUrl();
+                const meta = {
                     title: title,
                     artist: 'みんスタ 学習タイマー',
-                    album: '集中環境音',
-                    artwork: [
-                        { src: 'https://cdn-icons-png.flaticon.com/512/3048/3048122.png', sizes: '512x512', type: 'image/png' }
-                    ]
-                });
+                    album: '集中環境音'
+                };
+                if (icon) {
+                    meta.artwork = [
+                        { src: icon, sizes: '512x512', type: 'image/png' }
+                    ];
+                }
+                navigator.mediaSession.metadata = new MediaMetadata(meta);
                 navigator.mediaSession.setActionHandler('play', function () { togglePause(); });
                 navigator.mediaSession.setActionHandler('pause', function () { togglePause(); });
             }

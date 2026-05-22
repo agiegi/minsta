@@ -1,0 +1,2217 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>みんスタ - みんなで育てる学習の森</title>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="みんスタ">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Times New Roman', "Georgia", serif;
+            background: radial-gradient(circle, #EAE5D9 0%, #CAC1AC 100%);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            color: #3E2723;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 400px;
+            background: #FFFBF0;
+            min-height: 100vh;
+            padding: 30px 20px;
+            box-sizing: border-box;
+            border-radius: 30px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+            position: relative;
+        }
+
+        h1 {
+            text-align: center;
+            font-weight: bold;
+            font-size: 28px;
+            color: #5D4037;
+            margin-bottom: 5px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #8D6E63;
+            font-size: 12px;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-style: italic;
+        }
+
+        .card {
+            background: #FFFEF8;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+        }
+
+        .toggle-link {
+            text-align: center;
+            font-size: 13px;
+            color: #8D6E63;
+            margin-top: 15px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .toggle-link:hover {
+            color: #5D4037;
+        }
+
+        .goal-tags-container {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 5px;
+            margin-bottom: 15px;
+            border: 1px dashed #CAC1AC;
+            border-radius: 10px;
+            background: #FFFDF8;
+        }
+
+        .goal-tags-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .goal-tags-container::-webkit-scrollbar-thumb {
+            background: #CAC1AC;
+            border-radius: 10px;
+        }
+
+        .tag-category-group {
+            margin-bottom: 12px;
+        }
+
+        .tag-category {
+            width: 100%;
+            font-size: 11px;
+            color: #8D6E63;
+            font-weight: bold;
+            margin: 0 0 6px 4px;
+            border-bottom: 1px solid #EAE5D9;
+        }
+
+        .goal-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            padding-left: 4px;
+        }
+
+        .goal-tag {
+            background: #E8F5E9;
+            color: #2E7D32;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid #C8E6C9;
+            transition: 0.2s ease;
+        }
+
+        .goal-tag:hover {
+            background: #C8E6C9;
+            transform: scale(1.05);
+        }
+
+        .tree-visual {
+            font-size: 60px;
+            margin-bottom: 10px;
+            display: block;
+            transition: transform 0.5s ease;
+        }
+
+        .tree-visual:hover {
+            transform: scale(1.1);
+        }
+
+        .heatmap-container {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-top: 10px;
+        }
+
+        .heatmap-cell {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 3px;
+            background-color: #F3F0E8;
+            transition: all 0.3s ease;
+        }
+
+        .book-search-container {
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            padding: 10px 5px 20px 5px;
+            margin-top: 10px;
+            -webkit-overflow-scrolling: touch;
+            align-items: flex-start;
+        }
+
+        .book-search-container::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .book-search-container::-webkit-scrollbar-thumb {
+            background: #CAC1AC;
+            border-radius: 10px;
+        }
+
+        .book-item-small {
+            min-width: 85px;
+            max-width: 85px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .book-item-small:hover {
+            transform: scale(1.05);
+        }
+
+        .book-img-small {
+            width: 80px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 4px 6px 15px rgba(0, 0, 0, 0.25);
+            background-color: #eee;
+            border: 2px solid transparent;
+        }
+
+        .bookshelf-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .book-progress-card {
+            display: flex;
+            background: #FFF;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 1px solid #EAE5D9;
+        }
+
+        .book-progress-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .book-cover-mini {
+            width: 45px;
+            height: 65px;
+            object-fit: cover;
+            border-radius: 6px;
+            box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .book-info-area {
+            margin-left: 12px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .book-title-mini {
+            font-size: 12px;
+            font-weight: bold;
+            color: #3E2723;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.3;
+        }
+
+        .book-stats {
+            font-size: 10px;
+            color: #8D6E63;
+            margin-top: 2px;
+        }
+
+        .pomodoro-grid {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+
+        .pomo-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            background-color: #EAE5D9;
+        }
+
+        .pomo-box.filled {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button:disabled {
+            background: #D7CCC8;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: #FFFEF8;
+            border: 1px solid #EAE5D9;
+            border-radius: 15px;
+            box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.04);
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .chat-area,
+        .history-area {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #F3F0E8;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .msg {
+            margin-bottom: 12px;
+            padding: 10px;
+            font-size: 13px;
+            border-radius: 15px;
+        }
+
+        .msg-ai {
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+            color: #1B5E20;
+        }
+
+        .msg-user {
+            background: white;
+            border: 1px solid #D7CCC8;
+        }
+
+        .timer-display {
+            font-size: 48px;
+            text-align: center;
+            color: #3E2723;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .pomodoro-btn {
+            background: linear-gradient(135deg, #FF8A65 0%, #F4511E 100%);
+            box-shadow: 0 5px 15px rgba(244, 81, 30, 0.4);
+        }
+
+        #dashboard {
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #FFFBF0;
+            width: 90%;
+            max-width: 350px;
+            padding: 20px;
+            border-radius: 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* ✨ 新機能用スタイル */
+        .reaction-bar {
+            margin-top: 8px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .reaction-chip {
+            font-size: 12px;
+            padding: 2px 9px;
+            border-radius: 12px;
+            background: #FFFFFF;
+            border: 1px solid #E0DACE;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.15s ease, background 0.15s ease;
+            line-height: 1.7;
+        }
+
+        .reaction-chip:hover {
+            transform: scale(1.08);
+        }
+
+        .reaction-chip.mine {
+            background: #E8F5E9;
+            border-color: #66BB6A;
+            font-weight: bold;
+        }
+
+        .streak-display {
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #E65100;
+        }
+
+        .forest-visual {
+            font-size: 22px;
+            line-height: 1.5;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+
+        .rank-badge {
+            position: absolute;
+            top: -7px;
+            left: -7px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <h1>🌱 みんスタ</h1>
+        <p class="subtitle">〜 みんなで育てる学習の森 〜</p>
+
+        <div id="authScreen" class="card">
+            <div id="loginForm">
+                <h3 style="text-align:center; margin-top:0;">おかえりなさい</h3>
+                <input type="email" id="loginEmail" placeholder="メールアドレス">
+                <input type="password" id="loginPassword" placeholder="パスワード">
+                <button onclick="login()">ログイン</button>
+                <p class="toggle-link" onclick="toggleAuthMode()">▶ 新規登録はこちら</p>
+            </div>
+
+            <div id="registerForm" style="display: none;">
+                <h3 style="text-align:center; margin-top:0;">はじめまして</h3>
+                <input type="email" id="regEmail" placeholder="メールアドレス">
+                <input type="password" id="regPassword" placeholder="パスワード（半角英数）">
+
+                <p style="font-size: 12px; color: #666; text-align: center; margin-top: 15px;">目標を入力するか、一覧から検索・選択してください。
+                </p>
+                <input type="text" id="regName" placeholder="お名前">
+                <input type="text" id="regGoal" placeholder="🔍 学習の目標を入力" oninput="filterTags()">
+
+                <div class="goal-tags-container" id="tagsContainer">
+                    <div class="tag-category-group">
+                        <div class="tag-category">💻 IT・エンジニアリング</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('ITパスポート')">#ITパスポート</span><span
+                                class="goal-tag" onclick="setGoal('基本情報技術者')">#基本情報技術者</span><span class="goal-tag"
+                                onclick="setGoal('応用情報技術者')">#応用情報技術者</span><span class="goal-tag"
+                                onclick="setGoal('情報処理安全確保支援士')">#情報処理安全確保支援士</span><span class="goal-tag"
+                                onclick="setGoal('ネットワークスペシャリスト')">#ネットワークスペシャリスト</span><span class="goal-tag"
+                                onclick="setGoal('データベーススペシャリスト')">#データベーススペシャリスト</span><span class="goal-tag"
+                                onclick="setGoal('プロジェクトマネージャ')">#プロジェクトマネージャ</span><span class="goal-tag"
+                                onclick="setGoal('ITストラテジスト')">#ITストラテジスト</span><span class="goal-tag"
+                                onclick="setGoal('システムアーキテクト')">#システムアーキテクト</span><span class="goal-tag"
+                                onclick="setGoal('エンベデッドシステム')">#エンベデッドシステム</span><span class="goal-tag"
+                                onclick="setGoal('AWS認定')">#AWS認定</span><span class="goal-tag"
+                                onclick="setGoal('GCP認定')">#GCP認定</span><span class="goal-tag"
+                                onclick="setGoal('Azure認定')">#Azure認定</span><span class="goal-tag"
+                                onclick="setGoal('Python')">#Python</span><span class="goal-tag"
+                                onclick="setGoal('C / C++')">#C / C++</span><span class="goal-tag"
+                                onclick="setGoal('Java')">#Java</span><span class="goal-tag"
+                                onclick="setGoal('Rust')">#Rust</span><span class="goal-tag"
+                                onclick="setGoal('Go')">#Go</span><span class="goal-tag"
+                                onclick="setGoal('JavaScript / TS')">#JavaScript / TS</span><span class="goal-tag"
+                                onclick="setGoal('Ruby / PHP')">#Ruby / PHP</span><span class="goal-tag"
+                                onclick="setGoal('LinuC / LPIC')">#LinuC / LPIC</span><span class="goal-tag"
+                                onclick="setGoal('Cisco (CCNA/CCNP)')">#Cisco (CCNA/CCNP)</span><span class="goal-tag"
+                                onclick="setGoal('Oracle Master')">#Oracle Master</span><span class="goal-tag"
+                                onclick="setGoal('G検定 / E資格')">#G検定 / E資格</span><span class="goal-tag"
+                                onclick="setGoal('統計検定')">#統計検定</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">🏢 建築・不動産</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('一級建築士')">#一級建築士</span><span
+                                class="goal-tag" onclick="setGoal('二級建築士')">#二級建築士</span><span class="goal-tag"
+                                onclick="setGoal('木造建築士')">#木造建築士</span><span class="goal-tag"
+                                onclick="setGoal('宅地建物取引士')">#宅地建物取引士(宅建)</span><span class="goal-tag"
+                                onclick="setGoal('マンション管理士')">#マンション管理士</span><span class="goal-tag"
+                                onclick="setGoal('管理業務主任者')">#管理業務主任者</span><span class="goal-tag"
+                                onclick="setGoal('不動産鑑定士')">#不動産鑑定士</span><span class="goal-tag"
+                                onclick="setGoal('測量士')">#測量士</span><span class="goal-tag"
+                                onclick="setGoal('測量士補')">#測量士補</span><span class="goal-tag"
+                                onclick="setGoal('土地家屋調査士')">#土地家屋調査士</span><span class="goal-tag"
+                                onclick="setGoal('建築施工管理技士')">#建築施工管理技士</span><span class="goal-tag"
+                                onclick="setGoal('土木施工管理技士')">#土木施工管理技士</span><span class="goal-tag"
+                                onclick="setGoal('管工事施工管理技士')">#管工事施工管理技士</span><span class="goal-tag"
+                                onclick="setGoal('インテリアコーディネーター')">#インテリアコーディネーター</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">⚖️ 法律・司法・公務員</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('司法試験')">#司法試験</span><span
+                                class="goal-tag" onclick="setGoal('予備試験')">#予備試験</span><span class="goal-tag"
+                                onclick="setGoal('司法書士')">#司法書士</span><span class="goal-tag"
+                                onclick="setGoal('行政書士')">#行政書士</span><span class="goal-tag"
+                                onclick="setGoal('社会保険労務士')">#社会保険労務士</span><span class="goal-tag"
+                                onclick="setGoal('弁理士')">#弁理士</span><span class="goal-tag"
+                                onclick="setGoal('ビジネス実務法務')">#ビジネス実務法務</span><span class="goal-tag"
+                                onclick="setGoal('国家公務員総合職')">#国家公務員総合職</span><span class="goal-tag"
+                                onclick="setGoal('国家公務員一般職')">#国家公務員一般職</span><span class="goal-tag"
+                                onclick="setGoal('地方上級公務員')">#地方上級公務員</span><span class="goal-tag"
+                                onclick="setGoal('市役所職員')">#市役所職員</span><span class="goal-tag"
+                                onclick="setGoal('裁判所事務官')">#裁判所事務官</span><span class="goal-tag"
+                                onclick="setGoal('国税専門官')">#国税専門官</span><span class="goal-tag"
+                                onclick="setGoal('労働基準監督官')">#労働基準監督官</span><span class="goal-tag"
+                                onclick="setGoal('警察官')">#警察官</span><span class="goal-tag"
+                                onclick="setGoal('消防官')">#消防官</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">📊 会計・金融・ビジネス</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('公認会計士')">#公認会計士</span><span
+                                class="goal-tag" onclick="setGoal('税理士')">#税理士</span><span class="goal-tag"
+                                onclick="setGoal('日商簿記1級')">#日商簿記1級</span><span class="goal-tag"
+                                onclick="setGoal('日商簿記2級')">#日商簿記2級</span><span class="goal-tag"
+                                onclick="setGoal('日商簿記3級')">#日商簿記3級</span><span class="goal-tag"
+                                onclick="setGoal('FP1級')">#FP1級</span><span class="goal-tag"
+                                onclick="setGoal('FP2級')">#FP2級</span><span class="goal-tag"
+                                onclick="setGoal('FP3級')">#FP3級</span><span class="goal-tag"
+                                onclick="setGoal('中小企業診断士')">#中小企業診断士</span><span class="goal-tag"
+                                onclick="setGoal('証券外務員')">#証券外務員</span><span class="goal-tag"
+                                onclick="setGoal('貸金業務取扱主任者')">#貸金業務取扱主任者</span><span class="goal-tag"
+                                onclick="setGoal('秘書検定')">#秘書検定</span><span class="goal-tag"
+                                onclick="setGoal('MOS')">#MOS(Office)</span><span class="goal-tag"
+                                onclick="setGoal('販売士')">#販売士</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">🌐 語学・グローバル</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('TOEIC')">#TOEIC</span><span
+                                class="goal-tag" onclick="setGoal('TOEFL')">#TOEFL</span><span class="goal-tag"
+                                onclick="setGoal('IELTS')">#IELTS</span><span class="goal-tag"
+                                onclick="setGoal('英検1級')">#英検1級</span><span class="goal-tag"
+                                onclick="setGoal('英検準1級')">#英検準1級</span><span class="goal-tag"
+                                onclick="setGoal('英検2級')">#英検2級</span><span class="goal-tag"
+                                onclick="setGoal('英会話')">#英会話</span><span class="goal-tag"
+                                onclick="setGoal('漢検')">#漢検</span><span class="goal-tag"
+                                onclick="setGoal('HSK (中国語)')">#HSK (中国語)</span><span class="goal-tag"
+                                onclick="setGoal('中検 (中国語)')">#中検 (中国語)</span><span class="goal-tag"
+                                onclick="setGoal('TOPIK (韓国語)')">#TOPIK (韓国語)</span><span class="goal-tag"
+                                onclick="setGoal('仏検 (フランス語)')">#仏検 (フランス語)</span><span class="goal-tag"
+                                onclick="setGoal('独検 (ドイツ語)')">#独検 (ドイツ語)</span><span class="goal-tag"
+                                onclick="setGoal('スペイン語検定')">#スペイン語検定</span><span class="goal-tag"
+                                onclick="setGoal('日本語教育能力検定')">#日本語教育能力検定</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">🏥 医療・福祉・心理</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('医師国家試験')">#医師国家試験</span><span
+                                class="goal-tag" onclick="setGoal('歯科医師')">#歯科医師</span><span class="goal-tag"
+                                onclick="setGoal('薬剤師')">#薬剤師</span><span class="goal-tag"
+                                onclick="setGoal('看護師')">#看護師</span><span class="goal-tag"
+                                onclick="setGoal('保健師 / 助産師')">#保健師 / 助産師</span><span class="goal-tag"
+                                onclick="setGoal('理学療法士')">#理学療法士</span><span class="goal-tag"
+                                onclick="setGoal('作業療法士')">#作業療法士</span><span class="goal-tag"
+                                onclick="setGoal('臨床検査技師')">#臨床検査技師</span><span class="goal-tag"
+                                onclick="setGoal('診療放射線技師')">#診療放射線技師</span><span class="goal-tag"
+                                onclick="setGoal('救急救命士')">#救急救命士</span><span class="goal-tag"
+                                onclick="setGoal('社会福祉士')">#社会福祉士</span><span class="goal-tag"
+                                onclick="setGoal('精神保健福祉士')">#精神保健福祉士</span><span class="goal-tag"
+                                onclick="setGoal('介護福祉士')">#介護福祉士</span><span class="goal-tag"
+                                onclick="setGoal('保育士')">#保育士</span><span class="goal-tag"
+                                onclick="setGoal('公認心理師')">#公認心理師</span><span class="goal-tag"
+                                onclick="setGoal('臨床心理士')">#臨床心理士</span><span class="goal-tag"
+                                onclick="setGoal('登録販売者')">#登録販売者</span><span class="goal-tag"
+                                onclick="setGoal('医療事務')">#医療事務</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">⚙️ 工業・技術・科学</div>
+                        <div class="goal-tags"><span class="goal-tag" onclick="setGoal('電験一種')">#電験一種</span><span
+                                class="goal-tag" onclick="setGoal('電験二種')">#電験二種</span><span class="goal-tag"
+                                onclick="setGoal('電験三種')">#電験三種</span><span class="goal-tag"
+                                onclick="setGoal('第一種電気工事士')">#第一種電気工事士</span><span class="goal-tag"
+                                onclick="setGoal('第二種電気工事士')">#第二種電気工事士</span><span class="goal-tag"
+                                onclick="setGoal('危険物取扱者(甲)')">#危険物取扱者(甲)</span><span class="goal-tag"
+                                onclick="setGoal('危険物取扱者(乙)')">#危険物取扱者(乙)</span><span class="goal-tag"
+                                onclick="setGoal('危険物取扱者(丙)')">#危険物取扱者(丙)</span><span class="goal-tag"
+                                onclick="setGoal('消防設備士')">#消防設備士</span><span class="goal-tag"
+                                onclick="setGoal('ボイラー技士')">#ボイラー技士</span><span class="goal-tag"
+                                onclick="setGoal('エネルギー管理士')">#エネルギー管理士</span><span class="goal-tag"
+                                onclick="setGoal('技術士')">#技術士</span><span class="goal-tag"
+                                onclick="setGoal('無線従事者')">#無線従事者</span><span class="goal-tag"
+                                onclick="setGoal('自動車整備士')">#自動車整備士</span><span class="goal-tag"
+                                onclick="setGoal('気象予報士')">#気象予報士</span></div>
+                    </div>
+                    <div class="tag-category-group">
+                        <div class="tag-category">🎓 受験・教育・その他</div>
+                        <div class="goal-tags"><span class="goal-tag"
+                                onclick="setGoal('大学受験(共通テスト)')">#大学受験(共通テスト)</span><span class="goal-tag"
+                                onclick="setGoal('大学受験(二次・私大)')">#大学受験(二次・私大)</span><span class="goal-tag"
+                                onclick="setGoal('大学院入試')">#大学院入試</span><span class="goal-tag"
+                                onclick="setGoal('教員採用試験')">#教員採用試験</span><span class="goal-tag"
+                                onclick="setGoal('総合旅行業務取扱管理者')">#総合旅行業務取扱管理者</span><span class="goal-tag"
+                                onclick="setGoal('国内旅行業務取扱管理者')">#国内旅行業務取扱管理者</span><span class="goal-tag"
+                                onclick="setGoal('通関士')">#通関士</span><span class="goal-tag"
+                                onclick="setGoal('貿易実務検定')">#貿易実務検定</span><span class="goal-tag"
+                                onclick="setGoal('色彩検定')">#色彩検定</span><span class="goal-tag"
+                                onclick="setGoal('管理栄養士')">#管理栄養士</span><span class="goal-tag"
+                                onclick="setGoal('美容師 / 理容師')">#美容師 / 理容師</span><span class="goal-tag"
+                                onclick="setGoal('世界遺産検定')">#世界遺産検定</span><span class="goal-tag"
+                                onclick="setGoal('自動車免許')">#自動車免許</span></div>
+                    </div>
+                </div>
+
+                <label
+                    style="font-size: 11px; color: #8D6E63; display: block; text-align: left; margin: 10px 0 2px 5px;">📅
+                    目標の期日（任意）</label>
+                <input type="date" id="regDate" style="color: #5D4037;">
+
+                <button onclick="register()"
+                    style="background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%);">森の住人になる</button>
+                <p class="toggle-link" onclick="toggleAuthMode()">▶ すでにIDをお持ちの方（ログイン）</p>
+            </div>
+        </div>
+
+        <div id="dashboard">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img id="myProfileIcon" src=""
+                        style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid #66BB6A;"
+                        onclick="openProfileModal()">
+                    <p
+                        style="font-size:11px; color:#5D4037; margin:0; font-weight:bold; background:#EAE5D9; padding:4px 12px; border-radius:15px; letter-spacing: 1px;">
+                        ID: <span id="displayUserId">---</span>
+                    </p>
+                </div>
+                <div style="text-align: right;">
+                    <p onclick="logout()"
+                        style="font-size:12px; cursor:pointer; text-decoration:underline; color:#8D6E63; margin:0; margin-bottom: 5px;">
+                        ログアウト</p>
+                    <p onclick="openGoalModal()"
+                        style="font-size:12px; cursor:pointer; text-decoration:underline; color:#2E7D32; margin:0; font-weight:bold;">
+                        ⚙️ 目標・期日</p>
+                </div>
+            </div>
+
+            <div id="warningBanner"
+                style="display: none; background: #FFEBEE; border: 2px solid #E53935; color: #C62828; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(229,57,53,0.15);">
+            </div>
+
+            <div id="countdownBox" class="card"
+                style="text-align: center; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); display: none;">
+                <div style="font-size: 14px; color: #1565C0; font-weight: bold;">🎯 目標の期日まで</div>
+                <div id="daysLeft" style="font-size: 36px; font-weight: bold; color: #0D47A1; margin: 5px 0;">あと -- 日
+                </div>
+                <div id="goalDateText" style="font-size: 12px; color: #1976D2;"></div>
+            </div>
+
+            <div id="groupArea" class="card" style="display: none; background: #E8F5E9; border: 1px solid #C8E6C9;">
+                <h3 style="margin-top: 0; font-size: 14px; color: #2E7D32;">👥 今のチームメイト <span id="syncStatus"
+                        style="font-size:10px; color:#66BB6A; font-weight:normal;">(リアルタイム同期中🟢)</span></h3>
+                <div id="groupMembers" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px;"></div>
+
+                <div id="teamForestBox" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #C8E6C9;">
+                    <div style="font-size: 13px; font-weight: bold; color: #2E7D32;">🌲 チームで育てている森</div>
+                    <div id="teamForestVisual" class="forest-visual">🌱</div>
+                    <div id="teamForestText" style="font-size: 11px; color: #66BB6A;">チーム合計: 0 分</div>
+                </div>
+            </div>
+
+            <div id="rankBox" class="card"
+                style="text-align: center; background: linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 100%);">
+                <span id="treeIcon" class="tree-visual">🥚</span>
+                <div id="userRank" style="font-size: 20px; font-weight: bold; color: #856404;">---</div>
+                <div id="personalTime" style="font-size: 14px; color: #666;">累計: 0 分</div>
+                <div id="streakDisplay" class="streak-display"></div>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 14px;">📚 わたしの本棚（25分/マス）</h3>
+                    <button onclick="openBookModal()"
+                        style="width: auto; padding: 6px 12px; margin: 0; font-size: 10px; background: #8D6E63; box-shadow: none;">＋
+                        追加</button>
+                </div>
+
+                <div id="myBookshelfList" class="bookshelf-list">
+                    <p style="font-size:11px; color:#888; text-align:center;">参考書を追加して、マスを埋めていきましょう！</p>
+                </div>
+
+                <p
+                    style="font-size:11px; margin-top:15px; color:#8D6E63; margin-bottom:5px; border-top: 1px dashed #EAE5D9; padding-top: 10px;">
+                    🔍 ネットから本を検索して追加</p>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="bookSearchInput" placeholder="キーワードを入力" style="padding: 8px;">
+                    <button onclick="searchBooks()"
+                        style="width: 70px; margin-top: 8px; padding: 8px; background:#CAC1AC; color:#3E2723;">検索</button>
+                </div>
+                <div id="bookResults" class="book-search-container"></div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top: 0;">⏱️ 学習タイマー</h3>
+                <select id="activeBookSelect" style="margin-bottom: 15px; font-weight:bold; color:#5D4037;">
+                    <option value="">▼ 記録する参考書を選択 (任意)</option>
+                </select>
+                <div class="timer-display" id="display">00:00:00</div>
+
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="startTimer()" id="startBtn" style="background:#66BB6A;">START (通常)</button>
+                    <button onclick="startPomodoro()" id="pomoBtn" class="pomodoro-btn">🍅 25分 集中</button>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="togglePause()" id="pauseBtn" style="background:#FFCA28; color:#3E2723;" disabled>⏸
+                        一時停止</button>
+                    <button onclick="stopTimer()" id="stopBtn" style="background:#EF5350;" disabled>⏹ 終了して記録</button>
+                </div>
+
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #EAE5D9; text-align: center;">
+                    <label
+                        style="font-size: 12px; font-weight: bold; color: #5D4037; display: block; margin-bottom: 5px;">🎧
+                        集中を深める環境音</label>
+                    <select id="bgmSelect" onchange="handleSoundChange()"
+                        style="font-weight: bold; color: #3E2723; background: #F3F0E8; border: none; box-shadow: none;">
+                        <option value="none">🔇 無音 (OFF)</option>
+                        <option value="forest">🍃 森の鳥たち</option>
+                        <option value="fire">🔥 焚き火</option>
+                        <option value="rain">☔️ 雨の音 (合成)</option>
+                        <option value="waves">🌊 さざ波 (合成)</option>
+                        <option value="brown">📻 ブラウンノイズ (合成)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card" style="background: linear-gradient(135deg, #E1F5FE 0%, #E8F5E9 100%);">
+                <h3 style="margin-top: 0; font-size: 14px;">📅 今週の学習サマリー</h3>
+                <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 8px;">
+                    <div>
+                        <div id="weeklyMinutes" style="font-size: 24px; font-weight: bold; color: #0277BD;">0</div>
+                        <div style="font-size: 10px; color: #666;">分（直近7日）</div>
+                    </div>
+                    <div>
+                        <div id="weeklyDays" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
+                        <div style="font-size: 10px; color: #666;">日 学習した</div>
+                    </div>
+                    <div>
+                        <div id="weeklyPomodoro" style="font-size: 24px; font-weight: bold; color: #E65100;">0</div>
+                        <div style="font-size: 10px; color: #666;">🍅 マス</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top: 0; font-size: 14px;">📊 参考書ごとの学習割合</h3>
+                <div style="max-width: 230px; margin: 15px auto 0 auto;">
+                    <canvas id="studyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top: 0; font-size: 14px;">🟩 学習の芝生 (直近28日)</h3>
+                <div id="heatmap" class="heatmap-container"></div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top: 0; font-size: 14px;">📖 自分の学習履歴</h3>
+                <div id="historyList" class="history-area" style="font-size: 12px; color: #5D4037;">
+                    <p style="text-align:center; color:#888;">まだ学習記録がありません。</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📝 学習報告</h3>
+                <textarea id="reportContent" rows="2" placeholder="内容を入力"></textarea>
+                <input type="number" id="studyMinutes" value="0">
+                <button onclick="submitReport()">報告を送信</button>
+            </div>
+
+            <div class="card">
+                <h3>💬 掲示板</h3>
+                <div id="chatArea" class="chat-area"></div>
+                <input type="text" id="chatInput" placeholder="メッセージ">
+                <button onclick="sendMessage()">送信</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="profileModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">👤 プロフィール画像の設定</h3>
+            <input type="file" id="profileImageInput" accept="image/*" onchange="previewProfileImage(event)"
+                style="font-size: 12px;">
+            <div style="text-align:center; margin-top:10px;">
+                <img id="profilePreview" src=""
+                    style="width:100px; height:100px; object-fit:cover; border-radius:50%; border: 3px solid #EAE5D9;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="closeProfileModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
+                <button onclick="saveProfileImage()" style="background: #4CAF50; margin-top:0;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="goalModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">🎯 目標の変更</h3>
+            <p style="font-size:11px; color:#E53935; font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
+            <input type="text" id="editGoal" placeholder="新しい目標">
+            <label style="font-size: 11px; color: #8D6E63; display: block; margin: 10px 0 2px 5px;">📅 新しい期日</label>
+            <input type="date" id="editDate" style="color: #5D4037;">
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button onclick="closeGoalModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
+                <button onclick="updateGoal()" style="background: #4CAF50; margin-top:0;">変更する</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bookModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">📚 参考書を本棚に追加</h3>
+            <label style="font-size: 12px; color: #5D4037;">1. タイトル</label>
+            <input type="text" id="newBookTitle" placeholder="例: 徹底攻略 Python">
+            <label style="font-size: 12px; color: #5D4037; margin-top:10px; display:block;">2. マスと芝生の色</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="color" id="newBookColor" value="#66BB6A" style="width: 50px; height: 40px; padding: 2px;">
+                <span style="font-size:11px; color:#8D6E63;">この本の色になります</span>
+            </div>
+            <label style="font-size: 12px; color: #5D4037; margin-top:15px; display:block;">3. 表紙画像（任意）</label>
+            <input type="file" id="newBookImage" accept="image/*" onchange="previewImage(event)"
+                style="font-size: 12px;">
+            <div style="text-align:center; margin-top:10px;">
+                <img id="bookPreview"
+                    src="data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2280%22%20height%3D%22110%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23eee%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2212%22%20fill%3D%22%23999%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E"
+                    style="width:80px; height:110px; object-fit:cover; border-radius:8px;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="closeBookModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
+                <button onclick="saveBook()" style="background: #4CAF50; margin-top:0;">本棚に追加</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editBookModal" class="modal">
+        <div class="modal-content">
+            <h3 id="editBookModalTitle" style="margin-top:0; font-size:15px; color:#3E2723;">⚙️ 本の編集</h3>
+
+            <label style="font-size: 12px; color: #5D4037; margin-top:15px; display:block; text-align:left;">🎨
+                芝生とマスの色を変更</label>
+            <div style="display:flex; align-items:center; gap:15px; margin-top:5px;">
+                <input type="color" id="editBookColor" style="width: 60px; height: 40px; padding: 2px; cursor:pointer;">
+                <span style="font-size:11px; color:#8D6E63;">クリックして新しい色を選択</span>
+            </div>
+
+            <label style="font-size: 12px; color: #5D4037; margin-top:15px; display:block; text-align:left;">🖼️
+                表紙画像を変更</label>
+            <input type="file" id="editBookImage" accept="image/*" onchange="previewEditImage(event)"
+                style="font-size: 12px;">
+            <div style="text-align:center; margin-top:10px;">
+                <img id="editBookPreview" src=""
+                    style="width:80px; height:110px; object-fit:cover; border-radius:8px; border: 2px solid #EAE5D9;">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 25px;">
+                <button onclick="closeEditBookModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
+                <button onclick="saveEditBook()" style="background: #4CAF50; margin-top:0;">変更を保存</button>
+            </div>
+
+            <hr style="border:0; border-top:1px dashed #EAE5D9; margin:20px 0;">
+
+            <button onclick="deleteBook()"
+                style="background: #EF5350; margin-top:0; font-size:12px; padding:10px; box-shadow: 0 4px 10px rgba(239,83,80,0.25);">⚠️
+                この書物を本棚から削除する</button>
+        </div>
+    </div>
+
+    <audio id="bgm_forest" loop src="https://assets.mixkit.co/active_storage/sfx/1210/1210-preview.mp3"></audio>
+    <audio id="bgm_fire" loop
+        src="https://commons.wikimedia.org/wiki/Special:FilePath/Campfire_sound_ambience.ogg"></audio>
+    <audio id="bellSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+
+    <script>
+        const API_URL = '';
+        let currentUserId = null, currentUserName = "", currentGroupId = null, currentTargetDate = null, currentGoal = "";
+
+        // 改良（セキュリティ）: innerHTML へ埋め込む文字列を安全化するヘルパー。
+        // ユーザー名・本のタイトル・チャット内容などをそのまま innerHTML に入れると
+        // スクリプト混入（XSS）の危険があるため、HTML特殊文字をエスケープして表示する。
+        // 表示されるテキスト自体は従来と同じ見た目になる。
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // 改良（セキュリティ）: インラインstyleへ差し込む色は #rrggbb 形式のみ許可する。
+        // 想定外の値が来ても CSS が壊れたり注入されたりしないようにする。
+        function safeColor(value, fallback) {
+            const fb = fallback || '#66BB6A';
+            return (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) ? value : fb;
+        }
+
+        // ===== ✨ 新機能用のヘルパー群 =====
+
+        // 応援スタンプの定番セット
+        const STICKERS = ['👏', '🔥', '💪', '🎉'];
+
+        // メッセージ1件分の応援スタンプ表示を組み立てる
+        function renderReactions(m) {
+            const map = {};
+            (m.reactions || []).forEach(rx => { map[rx.emoji] = rx; });
+            const chips = STICKERS.map(em => {
+                const rx = map[em];
+                const count = rx ? rx.count : 0;
+                const mine = rx ? rx.mine : false;
+                const label = count > 0 ? `${em} ${count}` : em;
+                return `<span class="reaction-chip${mine ? ' mine' : ''}" data-action="react" data-msg-id="${m.id}" data-emoji="${em}">${label}</span>`;
+            }).join('');
+            return `<div class="reaction-bar">${chips}</div>`;
+        }
+
+        // スタンプのトグル送信（同じスタンプをもう一度押すと取り消し）
+        async function toggleReaction(messageId, emoji) {
+            if (!currentGroupId || !messageId) return;
+            try {
+                await fetch(`${API_URL}/messages/${messageId}/reactions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUserId, emoji: emoji })
+                });
+                fetchData();
+            } catch (e) {
+                console.log('reaction failed', e);
+            }
+        }
+
+        // 連続学習日数（ストリーク）の計算。今日まだ未記録でも、昨日までの連続は「継続中」とみなす。
+        function calcStreak(reports) {
+            if (!reports || reports.length === 0) return 0;
+            const days = new Set(reports.map(r => r.reported_at.split('T')[0]));
+            let streak = 0;
+            const d = new Date();
+            if (!days.has(d.toISOString().split('T')[0])) {
+                d.setDate(d.getDate() - 1);
+            }
+            while (days.has(d.toISOString().split('T')[0])) {
+                streak++;
+                d.setDate(d.getDate() - 1);
+            }
+            return streak;
+        }
+
+        // 直近7日間の学習サマリー（合計分・学習日数・ポモドーロ換算マス）を表示する
+        function renderWeeklySummary(reports) {
+            const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            let mins = 0;
+            const daySet = new Set();
+            reports.forEach(r => {
+                if (new Date(r.reported_at).getTime() >= weekAgo) {
+                    mins += r.study_minutes;
+                    daySet.add(r.reported_at.split('T')[0]);
+                }
+            });
+            document.getElementById('weeklyMinutes').innerText = mins;
+            document.getElementById('weeklyDays').innerText = daySet.size;
+            document.getElementById('weeklyPomodoro').innerText = Math.floor(mins / 25);
+        }
+
+        // チーム合計学習時間に応じて育つ「みんなの森」を描画する
+        function renderTeamForest(members) {
+            const teamTotal = members.reduce((s, m) => s + (m.minutes || 0), 0);
+            const stages = ['🌱', '🌿', '🌳', '🌲'];
+            const grown = Math.floor(teamTotal / 100); // 100分ごとに苗が1本育つ
+            let visual = '';
+            if (grown <= 0) {
+                visual = '🌱';
+            } else {
+                const treeCount = Math.min(grown, 30);
+                for (let i = 0; i < treeCount; i++) {
+                    const stageIdx = Math.min(stages.length - 1, Math.floor(i / 8) + 1);
+                    visual += stages[stageIdx];
+                }
+                if (grown > 30) visual += ' …';
+            }
+            document.getElementById('teamForestVisual').innerText = visual;
+            document.getElementById('teamForestText').innerText =
+                `チーム合計: ${teamTotal} 分（約 ${Math.floor(teamTotal / 60)} 時間）`;
+        }
+
+        // ポモドーロの休憩タイマー（5分）。Date.now基準なので背景タブでもズレにくい。
+        let breakTimerObj = null;
+        let breakEndTime = 0;
+        const BREAK_MINUTES = 5;
+
+        function startBreak() {
+            cancelBreak();
+            breakEndTime = Date.now() + BREAK_MINUTES * 60 * 1000;
+            const display = document.getElementById('display');
+            display.style.color = '#1565C0';
+            breakTimerObj = setInterval(() => {
+                const remain = Math.round((breakEndTime - Date.now()) / 1000);
+                if (remain <= 0) {
+                    cancelBreak();
+                    document.getElementById('display').innerText = '00:00:00';
+                    try { document.getElementById('bellSound').play(); } catch (e) { }
+                    alert('☕ 休憩おわり！次の25分も頑張りましょう🍅');
+                    return;
+                }
+                const mm = Math.floor(remain / 60).toString().padStart(2, '0');
+                const ss = (remain % 60).toString().padStart(2, '0');
+                display.innerText = `休憩 ${mm}:${ss}`;
+            }, 250);
+        }
+
+        function cancelBreak() {
+            if (breakTimerObj) { clearInterval(breakTimerObj); breakTimerObj = null; }
+            document.getElementById('display').style.color = '#3E2723';
+        }
+
+        let timerObj = null;
+        let isPomodoro = false;
+        let isPaused = false;
+        let timerStartTime = 0;
+        let accumulatedSeconds = 0;
+        let currentSecondsDisplay = 0;
+
+        let myBooks = [];
+        const NO_IMAGE_SVG = "data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2280%22%20height%3D%22110%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23eee%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2212%22%20fill%3D%22%23999%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E";
+        const DEFAULT_AVATAR = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2250%22%20fill%3D%22%23EAE5D9%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2265%22%20font-size%3D%2250%22%20text-anchor%3D%22middle%22%3E👤%3C%2Ftext%3E%3C%2Fsvg%3E";
+        let currentBase64Image = NO_IMAGE_SVG;
+        let currentEditBase64Image = ""; // 追加: 編集用の画像保持
+
+        let ws = null;
+        let bookTotalMinutes = {};
+        let editingBookId = null;
+        let currentSearchQuery = "";
+        let currentSearchStartIndex = 0;
+
+        let studyChartInstance = null;
+
+        let audioCtx = null;
+        let activeSynthNode = null;
+        let activeSynthGain = null;
+        let waveInterval = null;
+        let synthDest = null;
+        let synthAudioEl = null;
+
+        function initAudioCtx() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                synthDest = audioCtx.createMediaStreamDestination();
+                synthAudioEl = new Audio();
+                synthAudioEl.srcObject = synthDest.stream;
+                synthAudioEl.playsInline = true;
+                synthAudioEl.loop = true;
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function stopSynthAudio() {
+            if (activeSynthNode) {
+                activeSynthNode.stop();
+                activeSynthNode.disconnect();
+                activeSynthNode = null;
+            }
+            if (activeSynthGain) {
+                activeSynthGain.disconnect();
+                activeSynthGain = null;
+            }
+            if (waveInterval) {
+                clearInterval(waveInterval);
+                waveInterval = null;
+            }
+            if (synthAudioEl) {
+                synthAudioEl.pause();
+            }
+        }
+
+        function playBrownNoise() {
+            initAudioCtx();
+            stopSynthAudio();
+            let bufferSize = 2 * audioCtx.sampleRate;
+            let noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            let output = noiseBuffer.getChannelData(0);
+            let lastOut = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
+                output[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = output[i];
+                output[i] *= 3.5;
+            }
+            activeSynthNode = audioCtx.createBufferSource();
+            activeSynthNode.buffer = noiseBuffer;
+            activeSynthNode.loop = true;
+            let filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+            activeSynthGain = audioCtx.createGain();
+            activeSynthGain.gain.value = 0.08;
+            activeSynthNode.connect(filter);
+            filter.connect(activeSynthGain);
+            activeSynthGain.connect(synthDest);
+            activeSynthNode.start(0);
+            synthAudioEl.play().catch(e => console.log(e));
+        }
+
+        function playRainSound() {
+            initAudioCtx();
+            stopSynthAudio();
+            let bufferSize = 2 * audioCtx.sampleRate;
+            let noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            let output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            activeSynthNode = audioCtx.createBufferSource();
+            activeSynthNode.buffer = noiseBuffer;
+            activeSynthNode.loop = true;
+            let filter1 = audioCtx.createBiquadFilter();
+            filter1.type = 'lowpass';
+            filter1.frequency.value = 1000;
+            let filter2 = audioCtx.createBiquadFilter();
+            filter2.type = 'highpass';
+            filter2.frequency.value = 200;
+            activeSynthGain = audioCtx.createGain();
+            activeSynthGain.gain.value = 0.05;
+            activeSynthNode.connect(filter1);
+            filter1.connect(filter2);
+            filter2.connect(activeSynthGain);
+            activeSynthGain.connect(synthDest);
+            activeSynthNode.start(0);
+            synthAudioEl.play().catch(e => console.log(e));
+        }
+
+        function playWaveSound() {
+            initAudioCtx();
+            stopSynthAudio();
+            let bufferSize = 2 * audioCtx.sampleRate;
+            let noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            let output = noiseBuffer.getChannelData(0);
+            let b0, b1, b2, b3, b4, b5, b6;
+            b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.96900 * b2 + white * 0.1538520;
+                b3 = 0.86650 * b3 + white * 0.3104856;
+                b4 = 0.55000 * b4 + white * 0.5329522;
+                b5 = -0.7616 * b5 - white * 0.0168980;
+                output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+                output[i] *= 0.11;
+                b6 = white * 0.115926;
+            }
+            activeSynthNode = audioCtx.createBufferSource();
+            activeSynthNode.buffer = noiseBuffer;
+            activeSynthNode.loop = true;
+            let filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 800;
+            activeSynthGain = audioCtx.createGain();
+            activeSynthGain.gain.value = 0.01;
+            activeSynthNode.connect(filter);
+            filter.connect(activeSynthGain);
+            activeSynthGain.connect(synthDest);
+            activeSynthNode.start(0);
+            synthAudioEl.play().catch(e => console.log(e));
+
+            let isRising = true;
+            waveInterval = setInterval(() => {
+                if (!activeSynthGain) return;
+                const now = audioCtx.currentTime;
+                if (isRising) {
+                    activeSynthGain.gain.linearRampToValueAtTime(0.06, now + 3);
+                } else {
+                    activeSynthGain.gain.linearRampToValueAtTime(0.01, now + 4);
+                }
+                isRising = !isRising;
+            }, 4000);
+        }
+
+        // 改良: 動的に生成される要素のクリックを、親コンテナ1か所のリスナーで処理する
+        // （イベント委譲）。これにより innerHTML の onclick 属性へ文字列を埋め込む必要が
+        // なくなり、引用符・記号を含むデータでも壊れず、XSS も防げる。挙動は従来と同一。
+        function setupDelegatedEvents() {
+            const shelf = document.getElementById('myBookshelfList');
+            if (shelf) {
+                shelf.addEventListener('click', (e) => {
+                    const editEl = e.target.closest('[data-action="edit-book"]');
+                    if (editEl) {
+                        e.stopPropagation();
+                        openEditBookModal(editEl.dataset.bookId, editEl.dataset.bookTitle, editEl.dataset.bookColor);
+                        return;
+                    }
+                    const card = e.target.closest('[data-action="select-book"]');
+                    if (card) {
+                        selectBookForReport(parseInt(card.dataset.bookId), card.dataset.bookTitle);
+                    }
+                });
+            }
+
+            const results = document.getElementById('bookResults');
+            if (results) {
+                results.addEventListener('click', (e) => {
+                    if (e.target.closest('[data-action="load-more-books"]')) {
+                        searchBooks(true);
+                        return;
+                    }
+                    const item = e.target.closest('[data-action="add-searched-book"]');
+                    if (item) {
+                        openBookModal(item.dataset.title, item.dataset.thumb);
+                    }
+                });
+            }
+
+            const history = document.getElementById('historyList');
+            if (history) {
+                history.addEventListener('click', (e) => {
+                    const del = e.target.closest('[data-action="delete-report"]');
+                    if (del) {
+                        deleteReport(parseInt(del.dataset.reportId));
+                    }
+                });
+            }
+
+            // ✨ 新機能: 掲示板の応援スタンプのクリック処理
+            const chat = document.getElementById('chatArea');
+            if (chat) {
+                chat.addEventListener('click', (e) => {
+                    const chip = e.target.closest('[data-action="react"]');
+                    if (chip) {
+                        toggleReaction(parseInt(chip.dataset.msgId), chip.dataset.emoji);
+                    }
+                });
+            }
+        }
+
+        window.onload = async () => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed', err));
+            }
+
+            setupDelegatedEvents();
+
+            const savedId = localStorage.getItem('minsta_user_id');
+            if (savedId) {
+                try {
+                    const res = await fetch(`${API_URL}/users/`);
+                    const users = await res.json();
+                    const me = users.find(u => u.id === parseInt(savedId));
+                    if (me) {
+                        currentUserId = me.id;
+                        document.getElementById('displayUserId').innerText = currentUserId;
+                        document.getElementById('authScreen').style.display = 'none';
+                        document.getElementById('dashboard').style.display = 'block';
+
+                        await fetchBooks();
+                        await fetchData();
+                        connectWebSocket();
+                    } else {
+                        localStorage.removeItem('minsta_user_id');
+                    }
+                } catch (e) { }
+            }
+        };
+
+        function connectWebSocket() {
+            if (!currentGroupId) return;
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsHost = API_URL ? API_URL.replace(/^http(s?):\/\//, '') : window.location.host;
+            const wsUrl = `${wsProtocol}//${wsHost}/ws/${currentGroupId}`;
+
+            ws = new WebSocket(wsUrl);
+            ws.onmessage = function (event) {
+                if (event.data === "update") {
+                    fetchData();
+                }
+            };
+            ws.onclose = function () {
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        function filterTags() {
+            const query = document.getElementById('regGoal').value.toLowerCase();
+            const groups = document.getElementById('tagsContainer').querySelectorAll('.tag-category-group');
+            groups.forEach(group => {
+                const tags = group.querySelectorAll('.goal-tag');
+                let hasVisibleTag = false;
+                tags.forEach(tag => {
+                    const text = tag.innerText.toLowerCase();
+                    if (text.includes(query) || query === '') { tag.style.display = 'inline-block'; hasVisibleTag = true; }
+                    else { tag.style.display = 'none'; }
+                });
+                group.style.display = hasVisibleTag ? 'block' : 'none';
+            });
+        }
+
+        function setGoal(text) {
+            document.getElementById('regGoal').value = text.replace('#', '');
+            filterTags();
+            document.getElementById('regGoal').style.backgroundColor = "#E8F5E9";
+            setTimeout(() => document.getElementById('regGoal').style.backgroundColor = "#FFFEF8", 300);
+        }
+
+        function toggleAuthMode() {
+            const loginDiv = document.getElementById('loginForm'), regDiv = document.getElementById('registerForm');
+            loginDiv.style.display = loginDiv.style.display === 'none' ? 'block' : 'none';
+            regDiv.style.display = regDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function register() {
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const name = document.getElementById('regName').value;
+            const goal = document.getElementById('regGoal').value;
+            const date = document.getElementById('regDate').value;
+
+            if (!email || !password || !name || !goal) return alert("必須項目をすべて入力してください");
+
+            try {
+                const res = await fetch(`${API_URL}/users/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, name, goal, target_date: date || null })
+                });
+
+                if (!res.ok) throw new Error("すでに登録されているメールアドレスか、エラーが発生しました。");
+
+                const data = await res.json();
+                alert(`🌱 登録完了！\n\nあなたのユーザーIDは【 ${data.user.id} 】です！\nようこそ、みんスタへ！`);
+
+                document.getElementById('loginEmail').value = email;
+                document.getElementById('loginPassword').value = password;
+                login();
+            } catch (e) { alert(e.message); }
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) return alert("メールアドレスとパスワードを入力してください");
+
+            try {
+                const res = await fetch(`${API_URL}/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (!res.ok) throw new Error("メールアドレスかパスワードが間違っています。");
+
+                const data = await res.json();
+                currentUserId = data.user.id;
+                localStorage.setItem('minsta_user_id', currentUserId);
+                document.getElementById('displayUserId').innerText = currentUserId;
+                document.getElementById('authScreen').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+
+                await fetchBooks();
+                await fetchData();
+
+                if (ws) ws.close();
+                connectWebSocket();
+            } catch (e) { alert(e.message); }
+        }
+
+        function logout() {
+            if (ws) ws.close();
+            localStorage.removeItem('minsta_user_id');
+            location.reload();
+        }
+
+        let currentProfileBase64 = "";
+        function openProfileModal() {
+            const currentImg = document.getElementById('myProfileIcon').src;
+            document.getElementById('profilePreview').src = currentImg;
+            document.getElementById('profileImageInput').value = "";
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+        function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
+
+        function previewProfileImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 100;
+                    canvas.height = 100;
+                    const ctx = canvas.getContext('2d');
+                    const minSize = Math.min(img.width, img.height);
+                    const sx = (img.width - minSize) / 2;
+                    const sy = (img.height - minSize) / 2;
+                    ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, 100, 100);
+                    currentProfileBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('profilePreview').src = currentProfileBase64;
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        async function saveProfileImage() {
+            if (!currentProfileBase64) return closeProfileModal();
+            try {
+                const res = await fetch(`${API_URL}/users/${currentUserId}/profile_image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profile_image: currentProfileBase64 })
+                });
+                if (!res.ok) throw new Error();
+                closeProfileModal();
+                fetchData();
+                alert("プロフィール画像を更新しました！");
+            } catch (e) { alert("更新に失敗しました"); }
+        }
+
+
+        async function fetchBooks() {
+            const res = await fetch(`${API_URL}/users/${currentUserId}/books`);
+            myBooks = await res.json();
+            renderBookshelf();
+        }
+
+        function renderBookshelf() {
+            const shelfList = document.getElementById('myBookshelfList');
+            const select = document.getElementById('activeBookSelect');
+
+            const currentSelectedId = select.value;
+            if (myBooks.length === 0) {
+                shelfList.innerHTML = `<p style="font-size:11px; color:#888; text-align:center;">参考書を追加して、マスを埋めていきましょう！</p>`;
+            } else {
+                shelfList.innerHTML = '';
+            }
+
+            select.innerHTML = '<option value="">▼ 記録する参考書を選択 (任意)</option>';
+            myBooks.forEach(b => {
+                const color = safeColor(b.color);
+                select.innerHTML += `<option value="${b.id}">${escapeHtml(b.title)}</option>`;
+
+                const totalMins = bookTotalMinutes[b.id] || 0;
+                const pomodoroCount = Math.floor(totalMins / 25);
+
+                let boxesHTML = '';
+                for (let i = 0; i < Math.max(10, pomodoroCount + 1); i++) {
+                    if (i < pomodoroCount) {
+                        boxesHTML += `<div class="pomo-box filled" style="background-color: ${color};"></div>`;
+                    } else {
+                        boxesHTML += `<div class="pomo-box"></div>`;
+                    }
+                }
+
+                // 改良: タイトル等は onclick 属性に文字列連結せず data 属性で保持し、
+                // クリックはコンテナ側のイベント委譲（setupBookshelfEvents）で処理する。
+                // これにより引用符・記号を含むタイトルでも壊れず、XSS も防げる。
+                shelfList.innerHTML += `
+                    <div class="book-progress-card" data-action="select-book" data-book-id="${b.id}" data-book-title="${escapeHtml(b.title)}" style="border-left: 4px solid ${color}; position: relative;">
+                        <div data-action="edit-book" data-book-id="${b.id}" data-book-title="${escapeHtml(b.title)}" data-book-color="${color}" style="position: absolute; top: 6px; right: 6px; font-size: 13px; cursor: pointer; padding: 4px; background: rgba(255,255,255,0.85); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.15); z-index: 10;">⚙️</div>
+                        <img src="${escapeHtml(b.cover_image || NO_IMAGE_SVG)}" class="book-cover-mini">
+                        <div class="book-info-area">
+                            <div class="book-title-mini">${escapeHtml(b.title)}</div>
+                            <div class="book-stats">累計: ${totalMins}分 (🍅 ${pomodoroCount}マス)</div>
+                            <div class="pomodoro-grid">
+                                ${boxesHTML}
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            if (currentSelectedId) {
+                select.value = currentSelectedId;
+            }
+        }
+
+        // ✨ 変更：画像のBase64は内部配列から安全に取得する
+        // 改良: イベント委譲から呼ばれるため event 引数を廃止し、bookId は数値に正規化する。
+        function openEditBookModal(bookId, title, color) {
+            editingBookId = parseInt(bookId);
+            document.getElementById('editBookModalTitle').innerText = `⚙️ 『${title}』の編集`;
+            document.getElementById('editBookColor').value = safeColor(color);
+
+            // 内部の myBooks 配列から表紙画像を取り出す（HTMLクラッシュ対策）
+            const book = myBooks.find(b => b.id === editingBookId);
+            currentEditBase64Image = book && book.cover_image ? book.cover_image : NO_IMAGE_SVG;
+
+            document.getElementById('editBookPreview').src = currentEditBase64Image;
+            document.getElementById('editBookImage').value = ""; // ファイル選択をリセット
+
+            document.getElementById('editBookModal').style.display = 'flex';
+        }
+
+        function closeEditBookModal() {
+            document.getElementById('editBookModal').style.display = 'none';
+            editingBookId = null;
+        }
+
+        function previewEditImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 200;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    currentEditBase64Image = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('editBookPreview').src = currentEditBase64Image;
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        async function saveEditBook() {
+            const color = document.getElementById('editBookColor').value;
+            try {
+                const res = await fetch(`${API_URL}/books/${editingBookId}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // ✨ 変更：変更した画像データも一緒に送信
+                    body: JSON.stringify({ color: color, cover_image: currentEditBase64Image })
+                });
+                if (!res.ok) throw new Error("変更の保存に失敗しました");
+
+                closeEditBookModal();
+                await fetchBooks();
+                await fetchData();
+                alert("本の情報を更新しました！");
+            } catch (e) { alert(e.message); }
+        }
+
+        let isDeletingBook = false;
+        async function deleteBook() {
+            if (isDeletingBook) return;
+            if (!confirm("本当にこの参考書を本棚から削除しますか？\n\n※過去の学習マスの数や芝生の記録は消えませんが、本との紐付けは解除されます。")) return;
+
+            isDeletingBook = true;
+            try {
+                const res = await fetch(`${API_URL}/books/${editingBookId}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error("削除に失敗しました");
+
+                closeEditBookModal();
+                await fetchBooks();
+                await fetchData();
+                alert("本棚から削除しました。");
+            } catch (e) { alert(e.message); } finally {
+                isDeletingBook = false;
+            }
+        }
+
+        function openBookModal(title = "", imgUrl = "") {
+            document.getElementById('newBookTitle').value = title;
+            document.getElementById('newBookColor').value = getRandomColor();
+            currentBase64Image = imgUrl || NO_IMAGE_SVG;
+            document.getElementById('bookPreview').src = currentBase64Image;
+            document.getElementById('newBookImage').value = "";
+            document.getElementById('bookModal').style.display = 'flex';
+        }
+
+        function closeBookModal() { document.getElementById('bookModal').style.display = 'none'; }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 200;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    currentBase64Image = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('bookPreview').src = currentBase64Image;
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        async function saveBook() {
+            const title = document.getElementById('newBookTitle').value;
+            const color = document.getElementById('newBookColor').value;
+            if (!title) return alert("タイトルを入力してください");
+
+            await fetch(`${API_URL}/users/${currentUserId}/books`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, color: color, cover_image: currentBase64Image })
+            });
+            closeBookModal();
+            await fetchBooks();
+            alert("本棚に追加しました！");
+        }
+
+        async function searchBooks(isLoadMore = false) {
+            const searchInput = document.getElementById('bookSearchInput');
+            const resultsDiv = document.getElementById('bookResults');
+            const searchBtn = document.querySelector('button[onclick="searchBooks()"]');
+
+            let query;
+            if (isLoadMore) {
+                query = currentSearchQuery;
+                currentSearchStartIndex += 20;
+            } else {
+                query = searchInput.value.trim();
+                if (!query) return;
+                currentSearchQuery = query;
+                currentSearchStartIndex = 0;
+
+                searchBtn.disabled = true;
+                searchBtn.style.background = "#D7CCC8";
+                searchBtn.innerText = "検索中...";
+                resultsDiv.innerHTML = '<p style="font-size:12px; color:#666;">探索中...</p>';
+            }
+
+            try {
+                const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&startIndex=${currentSearchStartIndex}&key=AIzaSyCz4zfzkPoc2KME3axthoOrR_3EPqGjwlQ`;
+                const res = await fetch(url);
+
+                if (res.status === 429) {
+                    throw new Error("Googleの検索上限に達しました。数秒待ってからお試しください。");
+                }
+
+                const data = await res.json();
+
+                if (!isLoadMore) {
+                    resultsDiv.innerHTML = '';
+                } else {
+                    const loadMoreBtn = document.getElementById('loadMoreBooksBtn');
+                    if (loadMoreBtn) loadMoreBtn.remove();
+                }
+
+                if (data.items && data.items.length > 0) {
+                    data.items.forEach(item => {
+                        const rawTitle = item.volumeInfo.title || "";
+                        const thumb = item.volumeInfo.imageLinks ? item.volumeInfo.imageLinks.thumbnail : NO_IMAGE_SVG;
+                        // 改良: タイトル/サムネイルURLは data 属性で保持し、クリックは
+                        // イベント委譲で処理。外部API由来の文字列も安全に表示できる。
+                        resultsDiv.innerHTML += `
+                        <div class="book-item-small" data-action="add-searched-book" data-title="${escapeHtml(rawTitle)}" data-thumb="${escapeHtml(thumb)}">
+                            <img src="${escapeHtml(thumb)}" class="book-img-small">
+                            <div style="font-size: 10px; line-height: 1.2; margin-top: 4px; color: #5D4037; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(rawTitle)}</div>
+                        </div>`;
+                    });
+
+                    resultsDiv.innerHTML += `
+                    <div id="loadMoreBooksBtn" class="book-item-small" data-action="load-more-books" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: #EAE5D9; border-radius: 8px; height: 110px; border: 2px dashed #CAC1AC; cursor: pointer; min-width: 80px;">
+                        <div style="font-size: 24px; color: #8D6E63;">＋</div>
+                        <div style="font-size: 11px; font-weight: bold; color: #5D4037; margin-top: 4px;">もっと見る</div>
+                    </div>`;
+
+                } else {
+                    if (!isLoadMore) {
+                        resultsDiv.innerHTML = '<p style="font-size:12px; color:#666;">見つかりませんでした</p>';
+                    } else {
+                        resultsDiv.innerHTML += '<div style="display:flex; align-items:center; padding:0 10px;"><p style="font-size:11px; color:#888; margin:0; white-space:nowrap;">これ以上はありません</p></div>';
+                    }
+                }
+            } catch (error) {
+                if (!isLoadMore) {
+                    resultsDiv.innerHTML = `<p style="font-size:11px; color:#E53935; font-weight:bold;">⚠️ ${error.message || '通信エラーが発生しました'}</p>`;
+                } else {
+                    alert(error.message || "続きの取得に失敗しました");
+                }
+            } finally {
+                if (!isLoadMore) {
+                    searchBtn.disabled = false;
+                    searchBtn.style.background = "#CAC1AC";
+                    searchBtn.innerText = "検索";
+                }
+            }
+        }
+
+        function selectBookForReport(bookId, title) {
+            document.getElementById('activeBookSelect').value = bookId;
+            document.getElementById('reportContent').value = `📖『${title}』を学習しました`;
+            document.getElementById('activeBookSelect').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+
+        function setupMediaSession(title) {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: title,
+                    artist: 'みんスタ 学習タイマー',
+                    album: '集中環境音',
+                    artwork: [
+                        { src: 'https://cdn-icons-png.flaticon.com/512/3048/3048122.png', sizes: '512x512', type: 'image/png' }
+                    ]
+                });
+                navigator.mediaSession.setActionHandler('play', function () { togglePause(); });
+                navigator.mediaSession.setActionHandler('pause', function () { togglePause(); });
+            }
+        }
+
+        function playCurrentBGM() {
+            document.querySelectorAll('audio[id^="bgm_"]').forEach(a => a.pause());
+            stopSynthAudio();
+
+            const selected = document.getElementById('bgmSelect').value;
+            if (selected === "none" || !timerObj || isPaused) {
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
+                return;
+            }
+
+            if (selected === "brown") {
+                playBrownNoise();
+                setupMediaSession("📻 ブラウンノイズ");
+            } else if (selected === "rain") {
+                playRainSound();
+                setupMediaSession("☔️ 雨の音");
+            } else if (selected === "waves") {
+                playWaveSound();
+                setupMediaSession("🌊 さざ波");
+            } else {
+                const audio = document.getElementById('bgm_' + selected);
+                if (audio) {
+                    audio.play().catch(e => console.log("再生ブロックされました", e));
+                    const titleMap = { "forest": "🍃 森の鳥たち", "fire": "🔥 焚き火" };
+                    setupMediaSession(titleMap[selected] || "環境音");
+                }
+            }
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
+        }
+
+        function pauseCurrentBGM() {
+            document.querySelectorAll('audio[id^="bgm_"]').forEach(a => a.pause());
+            stopSynthAudio();
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
+        }
+
+        function handleSoundChange() {
+            playCurrentBGM();
+        }
+
+        function timerTick() {
+            if (isPaused) return;
+
+            const now = Date.now();
+            const sessionElapsed = Math.floor((now - timerStartTime) / 1000);
+            const totalElapsed = accumulatedSeconds + sessionElapsed;
+
+            if (!isPomodoro) {
+                currentSecondsDisplay = totalElapsed;
+                updateDisplay();
+            } else {
+                currentSecondsDisplay = (25 * 60) - totalElapsed;
+
+                if (currentSecondsDisplay <= 0) {
+                    currentSecondsDisplay = 0;
+                    updateDisplay();
+                    handlePomodoroEnd();
+                } else {
+                    updateDisplay();
+                }
+            }
+        }
+
+        function handlePomodoroEnd() {
+            clearInterval(timerObj);
+            pauseCurrentBGM();
+            try { document.getElementById('bellSound').play(); } catch (e) { }
+
+            resetTimerButtons();
+            const bookId = document.getElementById('activeBookSelect').value;
+            let content = document.getElementById('reportContent').value;
+            if (!content) { content = "🍅 25分のポモドーロを完了しました！"; }
+
+            fetch(`${API_URL}/reports/submit`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUserId, content: content, study_minutes: 25, book_id: bookId ? parseInt(bookId) : null })
+            }).then(() => {
+                document.getElementById('reportContent').value = "";
+                document.getElementById('studyMinutes').value = "0";
+                currentSecondsDisplay = 0;
+                updateDisplay();
+                fetchData();
+                alert("🍅 25分の集中セッションが完了しました！\n自動的に学習記録（マス）が追加されました。");
+                // ✨ 新機能: 続けて5分間の休憩タイマーを提案する
+                if (confirm("☕ 5分間の休憩をはじめますか？")) startBreak();
+            }).catch(e => {
+                alert("通信エラーが発生しましたが、25分は経過しました。手動で報告を送信してください。");
+                document.getElementById('studyMinutes').value = 25;
+            });
+        }
+
+        function startTimer() {
+            cancelBreak();
+            if (timerObj) clearInterval(timerObj);
+            isPomodoro = false;
+            isPaused = false;
+            accumulatedSeconds = 0;
+            currentSecondsDisplay = 0;
+            timerStartTime = Date.now();
+            updateDisplay();
+            prepareTimerUI();
+            timerObj = setInterval(timerTick, 500);
+        }
+
+        function startPomodoro() {
+            cancelBreak();
+            if (timerObj) clearInterval(timerObj);
+            isPomodoro = true;
+            isPaused = false;
+            accumulatedSeconds = 0;
+            currentSecondsDisplay = 25 * 60;
+            timerStartTime = Date.now();
+            updateDisplay();
+            prepareTimerUI();
+            timerObj = setInterval(timerTick, 500);
+        }
+
+        function prepareTimerUI() {
+            document.getElementById('pauseBtn').innerText = "⏸ 一時停止";
+            document.getElementById('pauseBtn').style.background = "#FFCA28";
+            document.getElementById('pauseBtn').style.color = "#3E2723";
+            document.getElementById('startBtn').disabled = true; document.getElementById('pomoBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false; document.getElementById('pauseBtn').disabled = false;
+
+            playCurrentBGM();
+        }
+
+        function togglePause() {
+            if (!isPaused) {
+                clearInterval(timerObj);
+                pauseCurrentBGM();
+
+                const now = Date.now();
+                accumulatedSeconds += Math.floor((now - timerStartTime) / 1000);
+
+                const btn = document.getElementById('pauseBtn');
+                btn.innerText = "▶ 再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
+                isPaused = true;
+            } else {
+                playCurrentBGM();
+                timerStartTime = Date.now();
+
+                const btn = document.getElementById('pauseBtn');
+                btn.innerText = "⏸ 一時停止"; btn.style.background = "#FFCA28"; btn.style.color = "#3E2723";
+                isPaused = false;
+                timerObj = setInterval(timerTick, 500);
+            }
+        }
+
+        function stopTimer() {
+            if (timerObj) clearInterval(timerObj);
+            pauseCurrentBGM();
+            let mins = 0;
+            if (!isPomodoro) {
+                mins = Math.max(1, Math.floor(currentSecondsDisplay / 60));
+            } else {
+                mins = Math.max(1, Math.floor(((25 * 60) - currentSecondsDisplay) / 60));
+            }
+            document.getElementById('studyMinutes').value = mins;
+            const btn = document.getElementById('pauseBtn');
+            btn.innerText = "▶ 再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
+            btn.disabled = false; isPaused = true;
+            document.getElementById('startBtn').disabled = false; document.getElementById('pomoBtn').disabled = false; document.getElementById('stopBtn').disabled = true;
+        }
+
+        function resetTimerButtons() {
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pomoBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true; document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').innerText = "⏸ 一時停止"; isPaused = false;
+        }
+
+        function updateDisplay() {
+            const absSeconds = Math.abs(currentSecondsDisplay);
+            const h = Math.floor(absSeconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((absSeconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (absSeconds % 60).toString().padStart(2, '0');
+            document.getElementById('display').innerText = `${h}:${m}:${s}`;
+        }
+
+
+        async function submitReport() {
+            const content = document.getElementById('reportContent').value, mins = document.getElementById('studyMinutes').value;
+            const bookId = document.getElementById('activeBookSelect').value;
+
+            if (!content || mins <= 0) return alert("内容と分数（1分以上）を入力してください");
+            await fetch(`${API_URL}/reports/submit`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUserId, content: content, study_minutes: parseInt(mins), book_id: bookId ? parseInt(bookId) : null })
+            });
+            document.getElementById('reportContent').value = ""; document.getElementById('studyMinutes').value = "0";
+            if (timerObj) clearInterval(timerObj);
+            currentSecondsDisplay = 0; updateDisplay();
+            resetTimerButtons();
+            fetchData();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+            if (!currentGroupId) return alert("チームに所属していません");
+            try {
+                await fetch(`${API_URL}/groups/${currentGroupId}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUserId, content: text })
+                });
+                input.value = "";
+                fetchData();
+            } catch (e) {
+                alert("メッセージの送信に失敗しました");
+            }
+        }
+
+        let isDeletingReport = false;
+        async function deleteReport(reportId) {
+            if (isDeletingReport) return;
+            if (!confirm("本当にこの学習記録を削除しますか？\n\n※この記録を削除すると、本棚の累計時間や、学習の芝生（マス目）からもマイナスされます。")) return;
+
+            isDeletingReport = true;
+            try {
+                const res = await fetch(`${API_URL}/reports/${reportId}?user_id=${currentUserId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!res.ok) throw new Error("削除に失敗しました");
+
+                await fetchData();
+
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                isDeletingReport = false;
+            }
+        }
+
+        function updateStudyChart(reports) {
+            const ctx = document.getElementById('studyChart').getContext('2d');
+            const chartData = {};
+            reports.forEach(r => {
+                const bookId = r.book_id || "none";
+                chartData[bookId] = (chartData[bookId] || 0) + r.study_minutes;
+            });
+
+            const labels = [];
+            const data = [];
+            const colors = [];
+
+            myBooks.forEach(b => {
+                if (chartData[b.id]) {
+                    labels.push(b.title);
+                    data.push(chartData[b.id]);
+                    colors.push(b.color);
+                    delete chartData[b.id];
+                }
+            });
+
+            if (chartData["none"] || Object.keys(chartData).length > 0) {
+                let otherSum = chartData["none"] || 0;
+                for (const [key, val] of Object.entries(chartData)) {
+                    if (key !== "none") otherSum += val;
+                }
+                if (otherSum > 0) {
+                    labels.push("その他");
+                    data.push(otherSum);
+                    colors.push("#CAC1AC");
+                }
+            }
+
+            if (data.length === 0) {
+                labels.push("記録なし");
+                data.push(1);
+                colors.push("#F3F0E8");
+            }
+
+            if (studyChartInstance) studyChartInstance.destroy();
+
+            studyChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#FFFEF8'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, color: '#5D4037' } }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function hexToRgba(hex, alpha) {
+            let r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function getRandomColor() {
+            const colors = ['#EF5350', '#EC407A', '#AB47BC', '#7E57C2', '#5C6BC0', '#42A5F5', '#29B6F6', '#26C6DA', '#26A69A', '#66BB6A', '#9CCC65', '#D4E157', '#FFEE58', '#FFCA28', '#FFA726', '#FF7043'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        async function fetchData() {
+            const userRes = await fetch(`${API_URL}/users/`);
+            const users = await userRes.json();
+            const me = users.find(u => u.id === currentUserId);
+
+            if (me) {
+                const oldGroupId = currentGroupId;
+                currentGroupId = me.group_id;
+                currentTargetDate = me.target_date;
+                currentGoal = me.goal;
+
+                if (oldGroupId !== currentGroupId && ws) {
+                    ws.close();
+                    connectWebSocket();
+                }
+
+                document.getElementById('myProfileIcon').src = me.profile_image || DEFAULT_AVATAR;
+
+                const todayStr = new Date().toISOString().split('T')[0];
+                const repRes = await fetch(`${API_URL}/users/${currentUserId}/reports`);
+                const reports = await repRes.json();
+
+                const hasTodayReport = reports.some(r => r.reported_at.startsWith(todayStr));
+                const warningBanner = document.getElementById('warningBanner');
+
+                if (!hasTodayReport && currentGroupId) {
+                    const strikeCount = me.strike_count || 0;
+                    const daysLeft = 3 - strikeCount;
+                    warningBanner.innerHTML = `⚠️ 本日の学習記録がありません！<br>現在 連続${strikeCount}日未報告です。（あと${daysLeft}日でチーム強制卒業）`;
+                    warningBanner.style.display = 'block';
+                } else {
+                    warningBanner.style.display = 'none';
+                }
+
+                bookTotalMinutes = {};
+                reports.forEach(r => {
+                    if (r.book_id) { bookTotalMinutes[r.book_id] = (bookTotalMinutes[r.book_id] || 0) + r.study_minutes; }
+                });
+
+                renderBookshelf();
+                updateStudyChart(reports);
+                drawCustomHeatmap(reports);
+                renderWeeklySummary(reports);
+
+                // ✨ 新機能: 連続学習日数（ストリーク）を表示する
+                const streak = calcStreak(reports);
+                const streakEl = document.getElementById('streakDisplay');
+                if (streak > 0) {
+                    streakEl.innerText = `🔥 ${streak}日連続で学習中！`;
+                } else {
+                    streakEl.innerText = '今日から連続記録をはじめましょう！';
+                }
+
+                const historyList = document.getElementById('historyList');
+                if (reports.length === 0) {
+                    historyList.innerHTML = '<p style="text-align:center; color:#888;">まだ学習記録がありません。</p>';
+                } else {
+                    historyList.innerHTML = reports.map(r => {
+                        const d = new Date(r.reported_at);
+                        const dateStr = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                        let bookLabel = "";
+                        if (r.book_id) {
+                            const b = myBooks.find(bk => bk.id === r.book_id);
+                            if (b) bookLabel = `<span style="background:${safeColor(b.color)}; color:white; padding:2px 6px; border-radius:10px; font-size:9px; margin-right:5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">${escapeHtml(b.title)}</span>`;
+                        }
+                        // 改良: 削除アイコンのクリックはイベント委譲で処理し、報告内容は
+                        // エスケープして表示する（記録内容に記号が含まれても安全）。
+                        return `<div style="background:white; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid #EAE5D9; position:relative;">
+                        <div data-action="delete-report" data-report-id="${r.id}" style="position:absolute; top:8px; right:8px; cursor:pointer; font-size:14px; opacity:0.6; transition:0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="この記録を削除">🗑️</div>
+                        <div style="font-size:10px; color:#888; margin-bottom:4px;">📅 ${dateStr}</div>
+                        <div style="line-height:1.4; padding-right:20px;">${bookLabel} ${escapeHtml(r.content)} <span style="font-weight:bold; color:#2E7D32;">(${r.study_minutes}分)</span></div>
+                    </div>`;
+                    }).join('');
+                }
+            }
+
+            if (currentTargetDate) {
+                document.getElementById('countdownBox').style.display = 'block';
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const target = new Date(currentTargetDate); target.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+                document.getElementById('daysLeft').innerText = diffDays > 0 ? `あと ${diffDays} 日` : diffDays === 0 ? "✨ 本日が期日です！ ✨" : `${Math.abs(diffDays)}日 経過`;
+                document.getElementById('goalDateText').innerText = `設定日: ${currentTargetDate.replace(/-/g, '/')}`;
+            }
+
+            const statsRes = await fetch(`${API_URL}/users/${currentUserId}/stats`);
+            const total = (await statsRes.json()).total_minutes;
+            document.getElementById('personalTime').innerText = `累計: ${total} 分`;
+
+            let icon = "🥚"; let rank = "🐣 見習い";
+            if (total >= 60) { icon = "🌱"; rank = "🔰 駆け出し"; }
+            if (total >= 300) { icon = "🌿"; rank = "⚔️ 開発者"; }
+            if (total >= 1000) { icon = "🌳"; rank = "🌲 守護者"; }
+            if (total >= 3000) { icon = "🌲🍎"; rank = "🏰 森の主"; }
+            document.getElementById('treeIcon').innerText = icon;
+            document.getElementById('userRank').innerText = "称号: " + rank;
+
+            if (currentGroupId) {
+                document.getElementById('groupArea').style.display = 'block';
+                const memRes = await fetch(`${API_URL}/groups/${currentGroupId}/members`);
+                const members = await memRes.json();
+
+                // ✨ 新機能: チーム合計時間で育つ「みんなの森」を描画
+                renderTeamForest(members);
+
+                // ✨ 新機能: 人間メンバーを学習時間の降順でランク付け（AIは対象外）
+                const ranked = members.filter(m => !m.is_ai).slice()
+                    .sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
+                const rankMap = {};
+                ranked.forEach((m, i) => { if (m.minutes > 0) rankMap[m.id] = i + 1; });
+                const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+                document.getElementById('groupMembers').innerHTML = members.map(m => {
+                    let iconHtml = m.profile_image
+                        ? `<img src="${escapeHtml(m.profile_image)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
+                        : `<div style="font-size: 28px;">${escapeHtml(m.icon)}</div>`;
+                    const rank = rankMap[m.id];
+                    const badge = rank ? `<span class="rank-badge">${medals[rank] || '#' + rank}</span>` : '';
+                    return `<div style="position: relative; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">${badge}<div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div></div>`;
+                }).join('');
+
+                const msgRes = await fetch(`${API_URL}/groups/${currentGroupId}/messages?user_id=${currentUserId}`);
+                const chatArea = document.getElementById('chatArea');
+                const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 1;
+                chatArea.innerHTML = (await msgRes.json()).map(m => {
+                    // cls の判定は元の名前（エスケープ前）で行い、表示時にエスケープする。
+                    const rawName = m.user_name || "";
+                    let cls = rawName.includes('システム') || rawName.includes('AI') ? 'msg-ai' : 'msg-user';
+                    let iconHtml = m.profile_image
+                        ? `<img src="${escapeHtml(m.profile_image)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 5px;">`
+                        : ``;
+                    // ✨ 新機能: システムメッセージ以外には応援スタンプを表示する
+                    const reactionHtml = rawName.includes('システム') ? '' : renderReactions(m);
+                    return `<div class="msg ${cls}"><b>${iconHtml}${escapeHtml(rawName)}</b><br>${escapeHtml(m.content)}${reactionHtml}</div>`;
+                }).join('');
+                if (isScrolledToBottom) chatArea.scrollTop = chatArea.scrollHeight;
+            } else { document.getElementById('groupArea').style.display = 'none'; }
+        }
+
+        function drawCustomHeatmap(reports) {
+            const container = document.getElementById('heatmap'); container.innerHTML = "";
+            const now = new Date();
+            const dailyData = {};
+
+            reports.forEach(r => {
+                const d = r.reported_at.split('T')[0];
+                if (!dailyData[d]) dailyData[d] = { totalMins: 0, books: {} };
+                dailyData[d].totalMins += r.study_minutes;
+                if (r.book_id) { dailyData[d].books[r.book_id] = (dailyData[d].books[r.book_id] || 0) + r.study_minutes; }
+            });
+
+            for (let i = 27; i >= 0; i--) {
+                const targetDate = new Date(); targetDate.setDate(now.getDate() - i);
+                const dateStr = targetDate.toISOString().split('T')[0];
+                const dayInfo = dailyData[dateStr];
+                const cell = document.createElement('div');
+                cell.className = `heatmap-cell`;
+
+                if (dayInfo && dayInfo.totalMins > 0) {
+                    let dominantBookId = null;
+                    let maxMins = 0;
+                    for (const [bId, mins] of Object.entries(dayInfo.books)) {
+                        if (mins > maxMins) { maxMins = mins; dominantBookId = parseInt(bId); }
+                    }
+
+                    let baseColor = "#66BB6A";
+                    if (dominantBookId) {
+                        const book = myBooks.find(b => b.id === dominantBookId);
+                        if (book) baseColor = safeColor(book.color);
+                    }
+
+                    let alpha = 0.25;
+                    if (dayInfo.totalMins >= 120) alpha = 1.0;
+                    else if (dayInfo.totalMins >= 60) alpha = 0.75;
+                    else if (dayInfo.totalMins >= 30) alpha = 0.5;
+
+                    cell.style.backgroundColor = hexToRgba(baseColor, alpha);
+                    cell.title = `${dateStr}: ${dayInfo.totalMins}分`;
+                } else {
+                    cell.style.backgroundColor = "#F3F0E8";
+                    cell.title = `${dateStr}: 0分`;
+                }
+                container.appendChild(cell);
+            }
+        }
+
+        function openGoalModal() { document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; document.getElementById('goalModal').style.display = 'flex'; }
+        function closeGoalModal() { document.getElementById('goalModal').style.display = 'none'; }
+
+        async function updateGoal() {
+            const newGoal = document.getElementById('editGoal').value, newDate = document.getElementById('editDate').value;
+            if (!newGoal) return alert("目標を入力してください");
+            await fetch(`${API_URL}/users/${currentUserId}/goal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: newGoal, target_date: newDate || null }) });
+            closeGoalModal(); alert("目標を更新しました！"); document.getElementById('groupArea').style.display = 'none'; fetchData();
+        }
+
+    </script>
+</body>
+
+</html>

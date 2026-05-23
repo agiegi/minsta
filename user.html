@@ -877,6 +877,38 @@
     <script>
         const API_URL = '';
         let currentUserId = null, currentUserName = "", currentGroupId = null, currentTargetDate = null, currentGoal = "";
+        // ✨ 認証: ログイン時に受け取るトークン。全API通信の本人確認に使う。
+        let authToken = null;
+
+        // ✨ 認証: すべてのAPI通信はこの関数を通す。ログイン中ならトークンを
+        // Authorization ヘッダーに自動で付与する。サーバーが 401（セッション無効）を
+        // 返したら、ログイン画面へ戻す。
+        async function apiFetch(path, options = {}) {
+            const opts = Object.assign({}, options);
+            opts.headers = Object.assign({}, options.headers || {});
+            if (authToken) {
+                opts.headers['Authorization'] = 'Bearer ' + authToken;
+            }
+            const res = await fetch(`${API_URL}${path}`, opts);
+            if (res.status === 401) {
+                handleAuthExpired();
+            }
+            return res;
+        }
+
+        // セッションが切れたときの後始末。トークンを破棄してログイン画面へ戻す。
+        function handleAuthExpired() {
+            authToken = null;
+            currentUserId = null;
+            currentGroupId = null;
+            localStorage.removeItem('minsta_token');
+            localStorage.removeItem('minsta_user_id');
+            try { if (typeof ws !== 'undefined' && ws) ws.close(); } catch (e) { }
+            const auth = document.getElementById('authScreen');
+            const dash = document.getElementById('dashboard');
+            if (auth) auth.style.display = 'block';
+            if (dash) dash.style.display = 'none';
+        }
 
         // 改良（セキュリティ）: innerHTML へ埋め込む文字列を安全化するヘルパー。
         // ユーザー名・本のタイトル・チャット内容などをそのまま innerHTML に入れると
@@ -922,7 +954,7 @@
         async function toggleReaction(messageId, emoji) {
             if (!currentGroupId || !messageId) return;
             try {
-                await fetch(`${API_URL}/messages/${messageId}/reactions`, {
+                await apiFetch(`/messages/${messageId}/reactions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: currentUserId, emoji: emoji })
@@ -1243,13 +1275,14 @@
 
             setupDelegatedEvents();
 
-            const savedId = localStorage.getItem('minsta_user_id');
-            if (savedId) {
+            // ✨ 認証: 保存したトークンでセッションを復元する。
+            const savedToken = localStorage.getItem('minsta_token');
+            if (savedToken) {
+                authToken = savedToken;
                 try {
-                    const res = await fetch(`${API_URL}/users/`);
-                    const users = await res.json();
-                    const me = users.find(u => u.id === parseInt(savedId));
-                    if (me) {
+                    const res = await apiFetch('/users/me');
+                    if (res.ok) {
+                        const me = await res.json();
                         currentUserId = me.id;
                         document.getElementById('displayUserId').innerText = currentUserId;
                         document.getElementById('authScreen').style.display = 'none';
@@ -1259,7 +1292,9 @@
                         await fetchData();
                         connectWebSocket();
                     } else {
-                        localStorage.removeItem('minsta_user_id');
+                        // トークンが無効。ログイン画面のまま（後始末は apiFetch 側で実施済み）。
+                        authToken = null;
+                        localStorage.removeItem('minsta_token');
                     }
                 } catch (e) { }
             }
@@ -1353,8 +1388,10 @@
                 if (!res.ok) throw new Error("メールアドレスかパスワードが間違っています。");
 
                 const data = await res.json();
+                // ✨ 認証: 発行されたトークンを保存し、以降の通信に使う。
+                authToken = data.token;
+                localStorage.setItem('minsta_token', authToken);
                 currentUserId = data.user.id;
-                localStorage.setItem('minsta_user_id', currentUserId);
                 document.getElementById('displayUserId').innerText = currentUserId;
                 document.getElementById('authScreen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
@@ -1367,8 +1404,14 @@
             } catch (e) { alert(e.message); }
         }
 
-        function logout() {
+        async function logout() {
+            // ✨ 認証: サーバー側のトークンも無効化してからログアウトする。
+            try {
+                await apiFetch('/users/logout', { method: 'POST' });
+            } catch (e) { }
             if (ws) ws.close();
+            authToken = null;
+            localStorage.removeItem('minsta_token');
             localStorage.removeItem('minsta_user_id');
             location.reload();
         }
@@ -1408,7 +1451,7 @@
         async function saveProfileImage() {
             if (!currentProfileBase64) return closeProfileModal();
             try {
-                const res = await fetch(`${API_URL}/users/${currentUserId}/profile_image`, {
+                const res = await apiFetch(`/users/${currentUserId}/profile_image`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ profile_image: currentProfileBase64 })
@@ -1422,7 +1465,7 @@
 
 
         async function fetchBooks() {
-            const res = await fetch(`${API_URL}/users/${currentUserId}/books`);
+            const res = await apiFetch(`/users/${currentUserId}/books`);
             myBooks = await res.json();
             renderBookshelf();
         }
@@ -1523,7 +1566,7 @@
         async function saveEditBook() {
             const color = document.getElementById('editBookColor').value;
             try {
-                const res = await fetch(`${API_URL}/books/${editingBookId}/update`, {
+                const res = await apiFetch(`/books/${editingBookId}/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     // ✨ 変更：変更した画像データも一緒に送信
@@ -1545,7 +1588,7 @@
 
             isDeletingBook = true;
             try {
-                const res = await fetch(`${API_URL}/books/${editingBookId}`, {
+                const res = await apiFetch(`/books/${editingBookId}`, {
                     method: 'DELETE'
                 });
                 if (!res.ok) throw new Error("削除に失敗しました");
@@ -1596,7 +1639,7 @@
             const color = document.getElementById('newBookColor').value;
             if (!title) return alert("タイトルを入力してください");
 
-            await fetch(`${API_URL}/users/${currentUserId}/books`, {
+            await apiFetch(`/users/${currentUserId}/books`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: title, color: color, cover_image: currentBase64Image })
             });
@@ -1629,8 +1672,7 @@
             try {
                 // 書籍検索はサーバー側プロキシ経由で行う。
                 // APIキーはサーバーの .env にのみ存在し、ブラウザには出てこない。
-                const url = `${API_URL}/api/books/search?q=${encodeURIComponent(query)}&startIndex=${currentSearchStartIndex}`;
-                const res = await fetch(url);
+                const res = await apiFetch(`/api/books/search?q=${encodeURIComponent(query)}&startIndex=${currentSearchStartIndex}`);
 
                 if (res.status === 429) {
                     throw new Error("Googleの検索上限に達しました。数秒待ってからお試しください。");
@@ -1808,7 +1850,7 @@
             let content = document.getElementById('reportContent').value;
             if (!content) { content = "🍅 25分のポモドーロを完了しました！"; }
 
-            fetch(`${API_URL}/reports/submit`, {
+            apiFetch(`/reports/submit`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: currentUserId, content: content, study_minutes: 25, book_id: bookId ? parseInt(bookId) : null })
             }).then(() => {
@@ -1921,7 +1963,7 @@
             const bookId = document.getElementById('activeBookSelect').value;
 
             if (!content || mins <= 0) return alert("内容と分数（1分以上）を入力してください");
-            await fetch(`${API_URL}/reports/submit`, {
+            await apiFetch(`/reports/submit`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: currentUserId, content: content, study_minutes: parseInt(mins), book_id: bookId ? parseInt(bookId) : null })
             });
@@ -1938,7 +1980,7 @@
             if (!text) return;
             if (!currentGroupId) return alert("チームに所属していません");
             try {
-                await fetch(`${API_URL}/groups/${currentGroupId}/messages`, {
+                await apiFetch(`/groups/${currentGroupId}/messages`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: currentUserId, content: text })
@@ -1957,7 +1999,7 @@
 
             isDeletingReport = true;
             try {
-                const res = await fetch(`${API_URL}/reports/${reportId}?user_id=${currentUserId}`, {
+                const res = await apiFetch(`/reports/${reportId}`, {
                     method: 'DELETE'
                 });
 
@@ -2045,9 +2087,9 @@
         }
 
         async function fetchData() {
-            const userRes = await fetch(`${API_URL}/users/`);
-            const users = await userRes.json();
-            const me = users.find(u => u.id === currentUserId);
+            const userRes = await apiFetch('/users/me');
+            if (!userRes.ok) return;
+            const me = await userRes.json();
 
             if (me) {
                 const oldGroupId = currentGroupId;
@@ -2063,7 +2105,7 @@
                 document.getElementById('myProfileIcon').src = me.profile_image || DEFAULT_AVATAR;
 
                 const todayStr = new Date().toISOString().split('T')[0];
-                const repRes = await fetch(`${API_URL}/users/${currentUserId}/reports`);
+                const repRes = await apiFetch(`/users/${currentUserId}/reports`);
                 const reports = await repRes.json();
 
                 const hasTodayReport = reports.some(r => r.reported_at.startsWith(todayStr));
@@ -2129,7 +2171,7 @@
                 document.getElementById('goalDateText').innerText = `設定日: ${currentTargetDate.replace(/-/g, '/')}`;
             }
 
-            const statsRes = await fetch(`${API_URL}/users/${currentUserId}/stats`);
+            const statsRes = await apiFetch(`/users/${currentUserId}/stats`);
             const total = (await statsRes.json()).total_minutes;
             document.getElementById('personalTime').innerText = `累計: ${total} 分`;
 
@@ -2143,7 +2185,7 @@
 
             if (currentGroupId) {
                 document.getElementById('groupArea').style.display = 'block';
-                const memRes = await fetch(`${API_URL}/groups/${currentGroupId}/members`);
+                const memRes = await apiFetch(`/groups/${currentGroupId}/members`);
                 const members = await memRes.json();
 
                 // ✨ 新機能: チーム合計時間で育つ「みんなの森」を描画
@@ -2165,7 +2207,7 @@
                     return `<div style="position: relative; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">${badge}<div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div></div>`;
                 }).join('');
 
-                const msgRes = await fetch(`${API_URL}/groups/${currentGroupId}/messages?user_id=${currentUserId}`);
+                const msgRes = await apiFetch(`/groups/${currentGroupId}/messages`);
                 const chatArea = document.getElementById('chatArea');
                 const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 1;
                 chatArea.innerHTML = (await msgRes.json()).map(m => {
@@ -2236,7 +2278,7 @@
         async function updateGoal() {
             const newGoal = document.getElementById('editGoal').value, newDate = document.getElementById('editDate').value;
             if (!newGoal) return alert("目標を入力してください");
-            await fetch(`${API_URL}/users/${currentUserId}/goal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: newGoal, target_date: newDate || null }) });
+            await apiFetch(`/users/${currentUserId}/goal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: newGoal, target_date: newDate || null }) });
             closeGoalModal(); alert("目標を更新しました！"); document.getElementById('groupArea').style.display = 'none'; fetchData();
         }
 

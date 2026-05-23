@@ -1,4 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+    Header,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from sqlalchemy import (
@@ -10,6 +17,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     func,
+    text,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from contextlib import asynccontextmanager
@@ -19,6 +27,7 @@ from dotenv import load_dotenv
 import urllib.request
 import urllib.parse
 import urllib.error
+import secrets
 import random
 import bcrypt
 import asyncio
@@ -72,6 +81,8 @@ class User(Base):
     is_ai = Column(Boolean, default=False)
     strike_count = Column(Integer, default=0)
     profile_image = Column(String, nullable=True)
+    # ✨ 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
+    auth_token = Column(String, nullable=True, index=True)
 
 
 class Book(Base):
@@ -114,12 +125,62 @@ class Reaction(Base):
 Base.metadata.create_all(bind=engine)
 
 
+# 既存DBへのスキーマ追補。
+# create_all は「新しいテーブル」は作成するが、既存テーブルへの「列の追加」は
+# 行わない。そのため、これまで運用してきた minsta.db には認証用の auth_token 列が
+# 存在しない。起動時に列の有無を調べ、なければ追加する（新規DBには影響しない）。
+def ensure_schema():
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(users)"))]
+        if "auth_token" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN auth_token VARCHAR"))
+            conn.commit()
+
+
+ensure_schema()
+
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+# --- 認証 ---
+# ログイン/登録時にランダムなトークンを発行して User.auth_token に保存する。
+# 以降のリクエストは「Authorization: Bearer <token>」ヘッダーでトークンを送り、
+# サーバーはトークンからユーザーを特定する（opaque token 方式）。
+# これにより、リクエストの user_id を詐称して他人のデータを操作することを防ぐ。
+
+
+def issue_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def get_current_user(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> User:
+    """Authorization ヘッダーのトークンから、ログイン中のユーザーを特定する。"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="ログインが必要です")
+    token = authorization[len("Bearer ") :]
+    user = db.query(User).filter(User.auth_token == token).first()
+    if not user:
+        raise HTTPException(
+            status_code=401, detail="セッションが無効です。再度ログインしてください"
+        )
+    return user
+
+
+def require_self(current_user: User, user_id: int):
+    """操作対象が本人かどうかを検証する。他人のデータなら 403 で拒否する。"""
+    if current_user.id != user_id:
+        raise HTTPException(
+            status_code=403, detail="他のユーザーのデータは操作できません"
+        )
 
 
 # --- WebSocket管理マネージャー ---
@@ -414,12 +475,17 @@ def register(user_data: dict, db: Session = Depends(get_db)):
         name=user_data["name"],
         goal=user_data["goal"],
         target_date=user_data.get("target_date"),
+        auth_token=issue_token(),
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     assign_group_logic(db, new_user)
-    return {"user": {"id": new_user.id, "name": new_user.name, "goal": new_user.goal}}
+    # ✨ 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
+    return {
+        "user": {"id": new_user.id, "name": new_user.name, "goal": new_user.goal},
+        "token": new_user.auth_token,
+    }
 
 
 @app.post("/users/login")
@@ -431,14 +497,51 @@ def login_user(login_data: dict, db: Session = Depends(get_db)):
         login_data["password"].encode("utf-8"), user.hashed_password.encode("utf-8")
     ):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    return {"user": {"id": user.id, "name": user.name, "goal": user.goal}}
+    # ✨ 認証: ログインのたびに新しいトークンを発行する。
+    user.auth_token = issue_token()
+    db.commit()
+    return {
+        "user": {"id": user.id, "name": user.name, "goal": user.goal},
+        "token": user.auth_token,
+    }
+
+
+# ✨ 認証: ログアウト。サーバー側のトークンを無効化する。
+@app.post("/users/logout")
+def logout_user(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.auth_token = None
+    db.commit()
+    return {"message": "Logged out"}
+
+
+# ✨ 認証: ログイン中ユーザー自身の情報を返す。
+# 旧 GET /users/（全ユーザーを返す）は、他人の情報まで露出するため廃止し、
+# 「自分の情報だけを返す」このエンドポイントに置き換えた。
+@app.get("/users/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "goal": current_user.goal,
+        "group_id": current_user.group_id,
+        "target_date": current_user.target_date,
+        "strike_count": current_user.strike_count,
+        "profile_image": current_user.profile_image,
+    }
 
 
 @app.post("/users/{user_id}/goal")
-async def update_goal(user_id: int, goal_data: dict, db: Session = Depends(get_db)):
+async def update_goal(
+    user_id: int,
+    goal_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
     user = db.query(User).filter(User.id == user_id).first()
-    # 改良（バグ修正）: 従来はユーザーが見つからない場合 None を参照して 500 エラーで
-    # クラッシュしていた。存在しない場合は 404 を返す。正常系の挙動は完全に不変。
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     old_group_id = user.group_id
@@ -458,8 +561,12 @@ async def update_goal(user_id: int, goal_data: dict, db: Session = Depends(get_d
 
 @app.post("/users/{user_id}/profile_image")
 async def update_profile_image(
-    user_id: int, image_data: dict, db: Session = Depends(get_db)
+    user_id: int,
+    image_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    require_self(current_user, user_id)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -470,25 +577,15 @@ async def update_profile_image(
     return {"message": "Profile image updated"}
 
 
-@app.get("/users/")
-def get_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
-    return [
-        {
-            "id": u.id,
-            "name": u.name,
-            "goal": u.goal,
-            "group_id": u.group_id,
-            "target_date": u.target_date,
-            "strike_count": u.strike_count,
-            "profile_image": u.profile_image,
-        }
-        for u in users
-    ]
-
-
 @app.get("/groups/{group_id}/members")
-def get_members(group_id: int, db: Session = Depends(get_db)):
+def get_members(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # ✨ 認証: 自分が所属するチームの情報のみ閲覧できる。
+    if current_user.group_id != group_id:
+        raise HTTPException(status_code=403, detail="このチームの情報は閲覧できません")
     members = db.query(User).filter(User.group_id == group_id).all()
 
     # 改良（N+1クエリ解消）: 従来は人間メンバーごとに reports を個別取得していた。
@@ -529,7 +626,12 @@ def get_members(group_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/users/{user_id}/stats")
-def get_stats(user_id: int, db: Session = Depends(get_db)):
+def get_stats(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
     # 改良: 合計の算出を DB 側の集計に委ねる（返却値は従来と同一）。
     total = (
         db.query(func.coalesce(func.sum(Report.study_minutes), 0))
@@ -540,7 +642,12 @@ def get_stats(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/users/{user_id}/books")
-def get_books(user_id: int, db: Session = Depends(get_db)):
+def get_books(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
     books = db.query(Book).filter(Book.user_id == user_id).all()
     return [
         {"id": b.id, "title": b.title, "color": b.color, "cover_image": b.cover_image}
@@ -549,7 +656,13 @@ def get_books(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/users/{user_id}/books")
-def add_book(user_id: int, book_data: dict, db: Session = Depends(get_db)):
+def add_book(
+    user_id: int,
+    book_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
     new_book = Book(
         user_id=user_id,
         title=book_data["title"],
@@ -563,10 +676,20 @@ def add_book(user_id: int, book_data: dict, db: Session = Depends(get_db)):
 
 # ✨ 変更：表紙画像のアップデートも処理できるように改良
 @app.post("/books/{book_id}/update")
-def update_book(book_id: int, book_data: dict, db: Session = Depends(get_db)):
+def update_book(
+    book_id: int,
+    book_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         return {"message": "Book already deleted"}
+    # ✨ 認証: 自分の参考書だけを編集できる。
+    if book.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403, detail="他のユーザーの参考書は操作できません"
+        )
 
     if "color" in book_data:
         book.color = book_data["color"]
@@ -578,10 +701,19 @@ def update_book(book_id: int, book_data: dict, db: Session = Depends(get_db)):
 
 
 @app.delete("/books/{book_id}")
-async def delete_book(book_id: int, db: Session = Depends(get_db)):
+async def delete_book(
+    book_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         return {"message": "Book already deleted"}
+    # ✨ 認証: 自分の参考書だけを削除できる。
+    if book.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403, detail="他のユーザーの参考書は操作できません"
+        )
     user_id = book.user_id
     db.query(Report).filter(Report.book_id == book_id).update({"book_id": None})
     db.delete(book)
@@ -593,21 +725,25 @@ async def delete_book(book_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/reports/submit")
-async def submit_report(report_data: dict, db: Session = Depends(get_db)):
+async def submit_report(
+    report_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # ✨ 認証: 学習記録は必ずログイン中ユーザー本人のものとして登録する。
+    # リクエストボディの user_id は信用せず、トークンから特定した本人を使う。
+    user = current_user
     r = Report(
-        user_id=report_data["user_id"],
+        user_id=user.id,
         book_id=report_data.get("book_id"),
         content=report_data["content"],
         study_minutes=report_data["study_minutes"],
     )
     db.add(r)
-
-    user = db.query(User).filter(User.id == report_data["user_id"]).first()
-    if user:
-        user.strike_count = 0
+    user.strike_count = 0
     db.commit()
 
-    if user and user.group_id:
+    if user.group_id:
         msg = Message(
             group_id=user.group_id,
             user_id=user.id,
@@ -638,7 +774,12 @@ async def submit_report(report_data: dict, db: Session = Depends(get_db)):
 
 
 @app.get("/users/{user_id}/reports")
-def get_reports(user_id: int, db: Session = Depends(get_db)):
+def get_reports(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
     reports = (
         db.query(Report)
         .filter(Report.user_id == user_id)
@@ -658,28 +799,39 @@ def get_reports(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.delete("/reports/{report_id}")
-async def delete_report(report_id: int, user_id: int, db: Session = Depends(get_db)):
+async def delete_report(
+    report_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # ✨ 認証: 自分の学習記録だけを削除できる。
+    # 従来は user_id をクエリで受け取っており詐称が可能だったため、
+    # トークンから特定した本人の ID で絞り込む。
     report = (
         db.query(Report)
-        .filter(Report.id == report_id, Report.user_id == user_id)
+        .filter(Report.id == report_id, Report.user_id == current_user.id)
         .first()
     )
     if not report:
         return {"message": "Report already deleted"}
     db.delete(report)
     db.commit()
-    user = db.query(User).filter(User.id == user_id).first()
-    if user and user.group_id:
-        await manager.broadcast_to_group(user.group_id, "update")
+    if current_user.group_id:
+        await manager.broadcast_to_group(current_user.group_id, "update")
     return {"message": "Report deleted"}
 
 
 @app.get("/groups/{group_id}/messages")
 def get_messages(
     group_id: int,
-    user_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # ✨ 認証: 自分が所属するチームの掲示板のみ閲覧できる。
+    if current_user.group_id != group_id:
+        raise HTTPException(
+            status_code=403, detail="このチームの掲示板は閲覧できません"
+        )
     msgs = (
         db.query(Message)
         .filter(Message.group_id == group_id)
@@ -706,14 +858,14 @@ def get_messages(
     for m in msgs:
         user = users_by_id.get(m.user_id)
 
-        # 絵文字ごとに件数を集計し、リクエストしたユーザー自身が押したかどうかも返す。
+        # 絵文字ごとに件数を集計し、ログイン中ユーザー自身が押したかどうかも返す。
         agg: Dict[str, dict] = {}
         for rx in reactions_by_msg.get(m.id, []):
             entry = agg.setdefault(
                 rx.emoji, {"emoji": rx.emoji, "count": 0, "mine": False}
             )
             entry["count"] += 1
-            if user_id is not None and rx.user_id == user_id:
+            if rx.user_id == current_user.id:
                 entry["mine"] = True
 
         res.append(
@@ -729,9 +881,17 @@ def get_messages(
 
 
 @app.post("/groups/{group_id}/messages")
-async def post_message(group_id: int, msg_data: dict, db: Session = Depends(get_db)):
+async def post_message(
+    group_id: int,
+    msg_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # ✨ 認証: 自分が所属するチームにのみ、本人として投稿できる。
+    if current_user.group_id != group_id:
+        raise HTTPException(status_code=403, detail="このチームには投稿できません")
     msg = Message(
-        group_id=group_id, user_id=msg_data["user_id"], content=msg_data["content"]
+        group_id=group_id, user_id=current_user.id, content=msg_data["content"]
     )
     db.add(msg)
     db.commit()
@@ -741,12 +901,19 @@ async def post_message(group_id: int, msg_data: dict, db: Session = Depends(get_
 
 # ✨ 新機能: メッセージへの応援リアクション（スタンプ）をトグルする。
 @app.post("/messages/{message_id}/reactions")
-async def toggle_reaction(message_id: int, data: dict, db: Session = Depends(get_db)):
+async def toggle_reaction(
+    message_id: int,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     msg = db.query(Message).filter(Message.id == message_id).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
+    # ✨ 認証: 自分が所属するチームのメッセージにのみ反応できる。
+    if current_user.group_id != msg.group_id:
+        raise HTTPException(status_code=403, detail="このメッセージには反応できません")
 
-    user_id = data["user_id"]
     emoji = data["emoji"]
 
     # 同じユーザー・同じ絵文字が既にあれば取り消し（トグル）、なければ追加する。
@@ -754,7 +921,7 @@ async def toggle_reaction(message_id: int, data: dict, db: Session = Depends(get
         db.query(Reaction)
         .filter(
             Reaction.message_id == message_id,
-            Reaction.user_id == user_id,
+            Reaction.user_id == current_user.id,
             Reaction.emoji == emoji,
         )
         .first()
@@ -762,7 +929,7 @@ async def toggle_reaction(message_id: int, data: dict, db: Session = Depends(get
     if existing:
         db.delete(existing)
     else:
-        db.add(Reaction(message_id=message_id, user_id=user_id, emoji=emoji))
+        db.add(Reaction(message_id=message_id, user_id=current_user.id, emoji=emoji))
     db.commit()
 
     await manager.broadcast_to_group(msg.group_id, "update")
@@ -772,9 +939,13 @@ async def toggle_reaction(message_id: int, data: dict, db: Session = Depends(get
 # ✨ セキュリティ改良: 書籍検索のサーバー側プロキシ。
 # 従来は user.html に Google Books API キーを直書きしていたため、ブラウザから
 # キーが丸見えだった。検索をサーバーが代行することで、キーは .env（サーバー）に
-# のみ存在し、ブラウザには一切渡らなくなる。
+# のみ存在し、ブラウザには一切渡らなくなる。ログイン中ユーザーのみ利用できる。
 @app.get("/api/books/search")
-def search_books(q: str, startIndex: int = 0):
+def search_books(
+    q: str,
+    startIndex: int = 0,
+    current_user: User = Depends(get_current_user),
+):
     if not GOOGLE_BOOKS_API_KEY:
         raise HTTPException(
             status_code=503,

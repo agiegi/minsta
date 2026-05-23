@@ -704,7 +704,7 @@
 
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <button onclick="startTimer()" id="startBtn" style="background:#66BB6A;">START (通常)</button>
-                    <button onclick="startPomodoro()" id="pomoBtn" class="pomodoro-btn">🍅 25分 集中</button>
+                    <button onclick="startPomodoro()" id="pomoBtn" class="pomodoro-btn">25分 集中</button>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <button onclick="togglePause()" id="pauseBtn" style="background:#FFCA28; color:#3E2723;" disabled>⏸
@@ -728,20 +728,21 @@
                 </div>
             </div>
 
-            <div class="card" style="background: linear-gradient(135deg, #E1F5FE 0%, #E8F5E9 100%);">
-                <h3 style="margin-top: 0; font-size: 14px;">📅 今週の学習サマリー</h3>
+            <div class="card"
+                style="background: linear-gradient(135deg, #F1F8E9 0%, #E8F5E9 100%); border: 1px solid #C8E6C9;">
+                <h3 style="margin-top: 0; font-size: 14px; color: #2E7D32;">今週の学習サマリー</h3>
                 <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 8px;">
                     <div>
-                        <div id="weeklyMinutes" style="font-size: 24px; font-weight: bold; color: #0277BD;">0</div>
-                        <div style="font-size: 10px; color: #666;">分（直近7日）</div>
+                        <div id="weeklyMinutes" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
+                        <div style="font-size: 10px; color: #8D6E63;">分（直近7日）</div>
                     </div>
                     <div>
                         <div id="weeklyDays" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
-                        <div style="font-size: 10px; color: #666;">日 学習した</div>
+                        <div style="font-size: 10px; color: #8D6E63;">日 学習した</div>
                     </div>
                     <div>
-                        <div id="weeklyPomodoro" style="font-size: 24px; font-weight: bold; color: #E65100;">0</div>
-                        <div style="font-size: 10px; color: #666;">🍅 マス</div>
+                        <div id="weeklyPomodoro" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
+                        <div style="font-size: 10px; color: #8D6E63;">マス</div>
                     </div>
                 </div>
             </div>
@@ -1507,7 +1508,7 @@
                         <img src="${escapeHtml(b.cover_image || NO_IMAGE_SVG)}" class="book-cover-mini">
                         <div class="book-info-area">
                             <div class="book-title-mini">${escapeHtml(b.title)}</div>
-                            <div class="book-stats">累計: ${totalMins}分 (🍅 ${pomodoroCount}マス)</div>
+                            <div class="book-stats">累計: ${totalMins}分 (${pomodoroCount}マス)</div>
                             <div class="pomodoro-grid">
                                 ${boxesHTML}
                             </div>
@@ -2134,7 +2135,7 @@
                 const streak = calcStreak(reports);
                 const streakEl = document.getElementById('streakDisplay');
                 if (streak > 0) {
-                    streakEl.innerText = `🔥 ${streak}日連続で学習中！`;
+                    streakEl.innerText = `${streak}日連続で学習中！`;
                 } else {
                     streakEl.innerText = '今日から連続記録をはじめましょう！';
                 }

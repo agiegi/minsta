@@ -81,7 +81,7 @@ class User(Base):
     is_ai = Column(Boolean, default=False)
     strike_count = Column(Integer, default=0)
     profile_image = Column(String, nullable=True)
-    # ✨ 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
+    # 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
     auth_token = Column(String, nullable=True, index=True)
 
 
@@ -113,7 +113,7 @@ class Message(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
-# ✨ 新機能: 掲示板メッセージへの応援リアクション（スタンプ）
+# 新機能: 掲示板メッセージへの応援リアクション（スタンプ）
 class Reaction(Base):
     __tablename__ = "reactions"
     id = Column(Integer, primary_key=True, index=True)
@@ -252,7 +252,7 @@ def get_custom_id(db: Session, is_ai: bool):
 # --- AIマッチングロジック ---
 AI_NAMES = ["[AI] サクラ", "[AI] ハルト", "[AI] ミナト", "[AI] ユイ", "[AI] メンター"]
 
-# ✨ 新機能: AIメンバーが学習報告に反応するときの応援メッセージ
+# 新機能: AIメンバーが学習報告に反応するときの応援メッセージ
 AI_ENCOURAGEMENTS = [
     "ナイス学習です！その積み重ねが実を結びますよ✨",
     "今日もよく頑張りましたね🍵 しっかり休んでください",
@@ -481,7 +481,7 @@ def register(user_data: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     assign_group_logic(db, new_user)
-    # ✨ 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
+    # 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
     return {
         "user": {"id": new_user.id, "name": new_user.name, "goal": new_user.goal},
         "token": new_user.auth_token,
@@ -497,7 +497,7 @@ def login_user(login_data: dict, db: Session = Depends(get_db)):
         login_data["password"].encode("utf-8"), user.hashed_password.encode("utf-8")
     ):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    # ✨ 認証: ログインのたびに新しいトークンを発行する。
+    # 認証: ログインのたびに新しいトークンを発行する。
     user.auth_token = issue_token()
     db.commit()
     return {
@@ -506,7 +506,7 @@ def login_user(login_data: dict, db: Session = Depends(get_db)):
     }
 
 
-# ✨ 認証: ログアウト。サーバー側のトークンを無効化する。
+# 認証: ログアウト。サーバー側のトークンを無効化する。
 @app.post("/users/logout")
 def logout_user(
     current_user: User = Depends(get_current_user),
@@ -517,7 +517,7 @@ def logout_user(
     return {"message": "Logged out"}
 
 
-# ✨ 認証: ログイン中ユーザー自身の情報を返す。
+# 認証: ログイン中ユーザー自身の情報を返す。
 # 旧 GET /users/（全ユーザーを返す）は、他人の情報まで露出するため廃止し、
 # 「自分の情報だけを返す」このエンドポイントに置き換えた。
 @app.get("/users/me")
@@ -583,7 +583,7 @@ def get_members(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分が所属するチームの情報のみ閲覧できる。
+    # 認証: 自分が所属するチームの情報のみ閲覧できる。
     if current_user.group_id != group_id:
         raise HTTPException(status_code=403, detail="このチームの情報は閲覧できません")
     members = db.query(User).filter(User.group_id == group_id).all()
@@ -674,7 +674,7 @@ def add_book(
     return {"message": "Book added"}
 
 
-# ✨ 変更：表紙画像のアップデートも処理できるように改良
+# 変更：表紙画像のアップデートも処理できるように改良
 @app.post("/books/{book_id}/update")
 def update_book(
     book_id: int,
@@ -685,7 +685,7 @@ def update_book(
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         return {"message": "Book already deleted"}
-    # ✨ 認証: 自分の参考書だけを編集できる。
+    # 認証: 自分の参考書だけを編集できる。
     if book.user_id != current_user.id:
         raise HTTPException(
             status_code=403, detail="他のユーザーの参考書は操作できません"
@@ -709,7 +709,7 @@ async def delete_book(
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         return {"message": "Book already deleted"}
-    # ✨ 認証: 自分の参考書だけを削除できる。
+    # 認証: 自分の参考書だけを削除できる。
     if book.user_id != current_user.id:
         raise HTTPException(
             status_code=403, detail="他のユーザーの参考書は操作できません"
@@ -730,7 +730,7 @@ async def submit_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 学習記録は必ずログイン中ユーザー本人のものとして登録する。
+    # 認証: 学習記録は必ずログイン中ユーザー本人のものとして登録する。
     # リクエストボディの user_id は信用せず、トークンから特定した本人を使う。
     user = current_user
     r = Report(
@@ -752,7 +752,7 @@ async def submit_report(
         db.add(msg)
         db.commit()
 
-        # ✨ 新機能: グループにいるAIメンバーが、一定の確率で応援メッセージを投稿する。
+        # 新機能: グループにいるAIメンバーが、一定の確率で応援メッセージを投稿する。
         # 過疎なチームでも反応が返ってくることで「続けやすい」体験を作る。
         ai_members = (
             db.query(User)
@@ -804,7 +804,7 @@ async def delete_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分の学習記録だけを削除できる。
+    # 認証: 自分の学習記録だけを削除できる。
     # 従来は user_id をクエリで受け取っており詐称が可能だったため、
     # トークンから特定した本人の ID で絞り込む。
     report = (
@@ -847,7 +847,7 @@ def get_messages(
             u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
         }
 
-    # ✨ 新機能: 各メッセージへの応援リアクションを 1 クエリでまとめて取得する。
+    # 新機能: 各メッセージへの応援リアクションを 1 クエリでまとめて取得する。
     msg_ids = [m.id for m in msgs]
     reactions_by_msg: Dict[int, list] = {}
     if msg_ids:
@@ -887,7 +887,7 @@ async def post_message(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分が所属するチームにのみ、本人として投稿できる。
+    # 認証: 自分が所属するチームにのみ、本人として投稿できる。
     if current_user.group_id != group_id:
         raise HTTPException(status_code=403, detail="このチームには投稿できません")
     msg = Message(
@@ -899,7 +899,7 @@ async def post_message(
     return {"message": "Message posted"}
 
 
-# ✨ 新機能: メッセージへの応援リアクション（スタンプ）をトグルする。
+# 新機能: メッセージへの応援リアクション（スタンプ）をトグルする。
 @app.post("/messages/{message_id}/reactions")
 async def toggle_reaction(
     message_id: int,
@@ -910,7 +910,7 @@ async def toggle_reaction(
     msg = db.query(Message).filter(Message.id == message_id).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
-    # ✨ 認証: 自分が所属するチームのメッセージにのみ反応できる。
+    #認証: 自分が所属するチームのメッセージにのみ反応できる。
     if current_user.group_id != msg.group_id:
         raise HTTPException(status_code=403, detail="このメッセージには反応できません")
 
@@ -936,7 +936,7 @@ async def toggle_reaction(
     return {"message": "Reaction toggled"}
 
 
-# ✨ セキュリティ改良: 書籍検索のサーバー側プロキシ。
+# セキュリティ改良: 書籍検索のサーバー側プロキシ。
 # 従来は user.html に Google Books API キーを直書きしていたため、ブラウザから
 # キーが丸見えだった。検索をサーバーが代行することで、キーは .env（サーバー）に
 # のみ存在し、ブラウザには一切渡らなくなる。ログイン中ユーザーのみ利用できる。

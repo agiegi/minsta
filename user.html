@@ -1996,6 +1996,11 @@
         let isDeletingReport = false;
         async function deleteReport(reportId) {
             if (isDeletingReport) return;
+            // 削除対象IDが正しく取れているか確認（NaN/undefinedを弾く）
+            if (reportId === undefined || reportId === null || Number.isNaN(reportId)) {
+                alert("削除する記録を特定できませんでした。ページを再読み込みしてからお試しください。");
+                return;
+            }
             if (!confirm("本当にこの学習記録を削除しますか？\n\n※この記録を削除すると、本棚の累計時間や、学習の芝生（マス目）からもマイナスされます。")) return;
 
             isDeletingReport = true;
@@ -2004,7 +2009,17 @@
                     method: 'DELETE'
                 });
 
-                if (!res.ok) throw new Error("削除に失敗しました");
+                // サーバーエラー（401/403/422/500など）
+                if (!res.ok) {
+                    throw new Error(`削除に失敗しました（サーバー応答: ${res.status}）`);
+                }
+
+                // 応答内容を確認。実際に削除されたときだけ "Report deleted" が返る。
+                // それ以外（記録が見つからない等）はサイレント失敗なので明示する。
+                const result = await res.json().catch(() => ({}));
+                if (result.message !== "Report deleted") {
+                    throw new Error("この記録を削除できませんでした。\nログインし直してから、もう一度お試しください。");
+                }
 
                 await fetchData();
 

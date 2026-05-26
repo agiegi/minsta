@@ -415,13 +415,6 @@
             margin-top: 6px;
             word-break: break-all;
         }
-
-        .rank-badge {
-            position: absolute;
-            top: -7px;
-            left: -7px;
-            font-size: 15px;
-        }
     </style>
 </head>
 
@@ -730,8 +723,7 @@
                 </div>
             </div>
 
-            <div class="card"
-                style="background: linear-gradient(135deg, #F1F8E9 0%, #E8F5E9 100%); border: 1px solid #C8E6C9;">
+            <div class="card" style="background: linear-gradient(135deg, #F1F8E9 0%, #E8F5E9 100%); border: 1px solid #C8E6C9;">
                 <h3 style="margin-top: 0; font-size: 14px; color: #2E7D32;">今週の学習サマリー</h3>
                 <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 8px;">
                     <div>
@@ -2250,20 +2242,14 @@
                     // ✨ 新機能: チーム合計時間で育つ「みんなの森」を描画
                     renderTeamForest(members);
 
-                    // ✨ 新機能: 人間メンバーを学習時間の降順でランク付け（AIは対象外）
-                    const ranked = members.filter(m => !m.is_ai).slice()
-                        .sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
-                    const rankMap = {};
-                    ranked.forEach((m, i) => { if (m.minutes > 0) rankMap[m.id] = i + 1; });
-                    const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
-
+                    // チームは「競争」ではなく「並走」がコンセプトのため、
+                    // 個人の順位付け（ランキング・メダル）は表示しない。
+                    // 各メンバーの名前と学習時間だけを並べ、仲間の存在が見える形にする。
                     document.getElementById('groupMembers').innerHTML = members.map(m => {
                         let iconHtml = m.profile_image
                             ? `<img src="${escapeHtml(m.profile_image)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
                             : `<div style="font-size: 28px;">${escapeHtml(m.icon)}</div>`;
-                        const rank = rankMap[m.id];
-                        const badge = rank ? `<span class="rank-badge">${medals[rank] || '#' + rank}</span>` : '';
-                        return `<div style="position: relative; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">${badge}<div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div></div>`;
+                        return `<div style="text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"><div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div></div>`;
                     }).join('');
                 } catch (e) {
                     console.error('チームメンバーの取得に失敗しました:', e);

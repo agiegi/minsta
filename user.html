@@ -748,6 +748,13 @@
             </div>
 
             <div class="card">
+                <h3>📝 学習報告</h3>
+                <textarea id="reportContent" rows="2" placeholder="内容を入力"></textarea>
+                <input type="number" id="studyMinutes" value="0">
+                <button onclick="submitReport()">報告を送信</button>
+            </div>
+
+            <div class="card">
                 <h3 style="margin-top: 0; font-size: 14px;">📊 参考書ごとの学習割合</h3>
                 <div style="max-width: 230px; margin: 15px auto 0 auto;">
                     <canvas id="studyChart"></canvas>
@@ -764,13 +771,6 @@
                 <div id="historyList" class="history-area" style="font-size: 12px; color: #5D4037;">
                     <p style="text-align:center; color:#888;">まだ学習記録がありません。</p>
                 </div>
-            </div>
-
-            <div class="card">
-                <h3>📝 学習報告</h3>
-                <textarea id="reportContent" rows="2" placeholder="内容を入力"></textarea>
-                <input type="number" id="studyMinutes" value="0">
-                <button onclick="submitReport()">報告を送信</button>
             </div>
 
             <div class="card">
@@ -2103,23 +2103,33 @@
         }
 
         async function fetchData() {
-            const userRes = await apiFetch('/users/me');
-            if (!userRes.ok) return;
-            const me = await userRes.json();
+            // --- 自分の情報を取得（これが取れないと何も表示できないので最初に） ---
+            let me;
+            try {
+                const userRes = await apiFetch('/users/me');
+                if (!userRes.ok) return;
+                me = await userRes.json();
+            } catch (e) {
+                console.error('ユーザー情報の取得に失敗しました:', e);
+                return;
+            }
+            if (!me) return;
 
-            if (me) {
-                const oldGroupId = currentGroupId;
-                currentGroupId = me.group_id;
-                currentTargetDate = me.target_date;
-                currentGoal = me.goal;
+            const oldGroupId = currentGroupId;
+            currentGroupId = me.group_id;
+            currentTargetDate = me.target_date;
+            currentGoal = me.goal;
 
-                if (oldGroupId !== currentGroupId && ws) {
-                    ws.close();
-                    connectWebSocket();
-                }
+            if (oldGroupId !== currentGroupId && ws) {
+                ws.close();
+                connectWebSocket();
+            }
 
-                document.getElementById('myProfileIcon').src = me.profile_image || DEFAULT_AVATAR;
+            document.getElementById('myProfileIcon').src = me.profile_image || DEFAULT_AVATAR;
 
+            // --- 学習記録（本棚・グラフ・芝生・サマリー・ストリーク・履歴） ---
+            // 改良: ここの通信が失敗しても、称号やチーム情報の表示は止めない。
+            try {
                 const todayStr = new Date().toISOString().split('T')[0];
                 const repRes = await apiFetch(`/users/${currentUserId}/reports`);
                 const reports = await repRes.json();
@@ -2176,8 +2186,11 @@
                     </div>`;
                     }).join('');
                 }
+            } catch (e) {
+                console.error('学習記録の取得・表示に失敗しました:', e);
             }
 
+            // --- 目標達成日のカウントダウン（通信不要） ---
             if (currentTargetDate) {
                 document.getElementById('countdownBox').style.display = 'block';
                 const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -2187,58 +2200,77 @@
                 document.getElementById('goalDateText').innerText = `設定日: ${currentTargetDate.replace(/-/g, '/')}`;
             }
 
-            const statsRes = await apiFetch(`/users/${currentUserId}/stats`);
-            const total = (await statsRes.json()).total_minutes;
-            document.getElementById('personalTime').innerText = `累計: ${total} 分`;
+            // --- 称号（累計学習時間） ---
+            try {
+                const statsRes = await apiFetch(`/users/${currentUserId}/stats`);
+                const total = (await statsRes.json()).total_minutes;
+                document.getElementById('personalTime').innerText = `累計: ${total} 分`;
 
-            let icon = "🥚"; let rank = "🐣 見習い";
-            if (total >= 60) { icon = "🌱"; rank = "🔰 駆け出し"; }
-            if (total >= 300) { icon = "🌿"; rank = "⚔️ 開発者"; }
-            if (total >= 1000) { icon = "🌳"; rank = "🌲 守護者"; }
-            if (total >= 3000) { icon = "🌲🍎"; rank = "🏰 森の主"; }
-            document.getElementById('treeIcon').innerText = icon;
-            document.getElementById('userRank').innerText = "称号: " + rank;
+                let icon = "🥚"; let rank = "🐣 見習い";
+                if (total >= 60) { icon = "🌱"; rank = "🔰 駆け出し"; }
+                if (total >= 300) { icon = "🌿"; rank = "⚔️ 開発者"; }
+                if (total >= 1000) { icon = "🌳"; rank = "🌲 守護者"; }
+                if (total >= 3000) { icon = "🌲🍎"; rank = "🏰 森の主"; }
+                document.getElementById('treeIcon').innerText = icon;
+                document.getElementById('userRank').innerText = "称号: " + rank;
+            } catch (e) {
+                console.error('累計時間の取得に失敗しました:', e);
+            }
 
+            // --- チーム（メンバー・掲示板） ---
             if (currentGroupId) {
                 document.getElementById('groupArea').style.display = 'block';
-                const memRes = await apiFetch(`/groups/${currentGroupId}/members`);
-                const members = await memRes.json();
 
-                // ✨ 新機能: チーム合計時間で育つ「みんなの森」を描画
-                renderTeamForest(members);
+                // メンバー一覧と「みんなの森」
+                try {
+                    const memRes = await apiFetch(`/groups/${currentGroupId}/members`);
+                    const members = await memRes.json();
 
-                // ✨ 新機能: 人間メンバーを学習時間の降順でランク付け（AIは対象外）
-                const ranked = members.filter(m => !m.is_ai).slice()
-                    .sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
-                const rankMap = {};
-                ranked.forEach((m, i) => { if (m.minutes > 0) rankMap[m.id] = i + 1; });
-                const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+                    // ✨ 新機能: チーム合計時間で育つ「みんなの森」を描画
+                    renderTeamForest(members);
 
-                document.getElementById('groupMembers').innerHTML = members.map(m => {
-                    let iconHtml = m.profile_image
-                        ? `<img src="${escapeHtml(m.profile_image)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
-                        : `<div style="font-size: 28px;">${escapeHtml(m.icon)}</div>`;
-                    const rank = rankMap[m.id];
-                    const badge = rank ? `<span class="rank-badge">${medals[rank] || '#' + rank}</span>` : '';
-                    return `<div style="position: relative; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">${badge}<div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div></div>`;
-                }).join('');
+                    // ✨ 新機能: 人間メンバーを学習時間の降順でランク付け（AIは対象外）
+                    const ranked = members.filter(m => !m.is_ai).slice()
+                        .sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
+                    const rankMap = {};
+                    ranked.forEach((m, i) => { if (m.minutes > 0) rankMap[m.id] = i + 1; });
+                    const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
-                const msgRes = await apiFetch(`/groups/${currentGroupId}/messages`);
-                const chatArea = document.getElementById('chatArea');
-                const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 1;
-                chatArea.innerHTML = (await msgRes.json()).map(m => {
-                    // cls の判定は元の名前（エスケープ前）で行い、表示時にエスケープする。
-                    const rawName = m.user_name || "";
-                    let cls = rawName.includes('システム') || rawName.includes('AI') ? 'msg-ai' : 'msg-user';
-                    let iconHtml = m.profile_image
-                        ? `<img src="${escapeHtml(m.profile_image)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 5px;">`
-                        : ``;
-                    // ✨ 新機能: システムメッセージ以外には応援スタンプを表示する
-                    const reactionHtml = rawName.includes('システム') ? '' : renderReactions(m);
-                    return `<div class="msg ${cls}"><b>${iconHtml}${escapeHtml(rawName)}</b><br>${escapeHtml(m.content)}${reactionHtml}</div>`;
-                }).join('');
-                if (isScrolledToBottom) chatArea.scrollTop = chatArea.scrollHeight;
-            } else { document.getElementById('groupArea').style.display = 'none'; }
+                    document.getElementById('groupMembers').innerHTML = members.map(m => {
+                        let iconHtml = m.profile_image
+                            ? `<img src="${escapeHtml(m.profile_image)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
+                            : `<div style="font-size: 28px;">${escapeHtml(m.icon)}</div>`;
+                        const rank = rankMap[m.id];
+                        const badge = rank ? `<span class="rank-badge">${medals[rank] || '#' + rank}</span>` : '';
+                        return `<div style="position: relative; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">${badge}<div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div></div>`;
+                    }).join('');
+                } catch (e) {
+                    console.error('チームメンバーの取得に失敗しました:', e);
+                }
+
+                // 掲示板
+                try {
+                    const msgRes = await apiFetch(`/groups/${currentGroupId}/messages`);
+                    const chatArea = document.getElementById('chatArea');
+                    const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 1;
+                    chatArea.innerHTML = (await msgRes.json()).map(m => {
+                        // cls の判定は元の名前（エスケープ前）で行い、表示時にエスケープする。
+                        const rawName = m.user_name || "";
+                        let cls = rawName.includes('システム') || rawName.includes('AI') ? 'msg-ai' : 'msg-user';
+                        let iconHtml = m.profile_image
+                            ? `<img src="${escapeHtml(m.profile_image)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 5px;">`
+                            : ``;
+                        // ✨ 新機能: システムメッセージ以外には応援スタンプを表示する
+                        const reactionHtml = rawName.includes('システム') ? '' : renderReactions(m);
+                        return `<div class="msg ${cls}"><b>${iconHtml}${escapeHtml(rawName)}</b><br>${escapeHtml(m.content)}${reactionHtml}</div>`;
+                    }).join('');
+                    if (isScrolledToBottom) chatArea.scrollTop = chatArea.scrollHeight;
+                } catch (e) {
+                    console.error('掲示板の取得に失敗しました:', e);
+                }
+            } else {
+                document.getElementById('groupArea').style.display = 'none';
+            }
         }
 
         function drawCustomHeatmap(reports) {

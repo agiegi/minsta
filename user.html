@@ -631,6 +631,8 @@
                     </p>
                 </div>
                 <div style="text-align: right;">
+                    <button onclick="refreshData()" id="refreshBtn"
+                        style="width:auto; font-size:11px; padding:4px 14px; margin:0 0 6px 0;">更新</button>
                     <p onclick="logout()"
                         style="font-size:12px; cursor:pointer; text-decoration:underline; color:#8D6E63; margin:0; margin-bottom: 5px;">
                         ログアウト</p>
@@ -1403,6 +1405,25 @@
                 if (ws) ws.close();
                 connectWebSocket();
             } catch (e) { alert(e.message); }
+        }
+
+        // ✨ 更新ボタン: ページ全体は再読み込みせず、表示データだけを取り直す。
+        // PWAとしてホーム画面から起動するとブラウザの更新（プルトゥリフレッシュ）が
+        // 使えないため、その代わりの手段として用意している。
+        let isRefreshing = false;
+        async function refreshData() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            const btn = document.getElementById('refreshBtn');
+            if (btn) { btn.disabled = true; btn.innerText = '更新中...'; }
+            try {
+                await fetchData();
+            } catch (e) {
+                console.error('更新に失敗しました:', e);
+            } finally {
+                isRefreshing = false;
+                if (btn) { btn.disabled = false; btn.innerText = '更新'; }
+            }
         }
 
         async function logout() {

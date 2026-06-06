@@ -284,32 +284,37 @@ AI_ENCOURAGEMENTS = [
 def adjust_group_members(db: Session, group_id: int, goal: str):
     if not group_id:
         return
-    members = db.query(User).filter(User.group_id == group_id).all()
-    humans = [m for m in members if not m.is_ai]
-    ais = [m for m in members if m.is_ai]
-    total = len(humans) + len(ais)
-    while total < 3:
-        used_ai_names = [a.name for a in ais]
-        available_names = [n for n in AI_NAMES if n not in used_ai_names]
-        if not available_names:
-            available_names = AI_NAMES
-        new_ai_id = get_custom_id(db, is_ai=True)
-        new_ai = User(
-            id=new_ai_id,
-            name=random.choice(available_names),
-            goal=goal,
-            group_id=group_id,
-            is_ai=True,
-        )
-        db.add(new_ai)
+    try:
+        members = db.query(User).filter(User.group_id == group_id).all()
+        humans = [m for m in members if not m.is_ai]
+        ais = [m for m in members if m.is_ai]
+        total = len(humans) + len(ais)
+        while total < 3:
+            used_ai_names = [a.name for a in ais]
+            available_names = [n for n in AI_NAMES if n not in used_ai_names]
+            if not available_names:
+                available_names = AI_NAMES
+            new_ai_id = get_custom_id(db, is_ai=True)
+            new_ai = User(
+                id=new_ai_id,
+                name=random.choice(available_names),
+                goal=goal,
+                group_id=group_id,
+                is_ai=True,
+            )
+            db.add(new_ai)
+            db.commit()
+            ais.append(new_ai)
+            total += 1
+        while total > 3 and ais:
+            ai_to_remove = ais.pop()
+            db.delete(ai_to_remove)
+            total -= 1
         db.commit()
-        ais.append(new_ai)
-        total += 1
-    while total > 3 and ais:
-        ai_to_remove = ais.pop()
-        db.delete(ai_to_remove)
-        total -= 1
-    db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"adjust_group_members failed (group {group_id}): {e}")
+        raise
 
 
 def assign_group_logic(db: Session, user: User):
@@ -481,24 +486,31 @@ def register(user_data: dict, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_data["email"]).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    salt = bcrypt.gensalt()
-    hashed_pw = bcrypt.hashpw(user_data["password"].encode("utf-8"), salt).decode(
-        "utf-8"
-    )
-    new_human_id = get_custom_id(db, is_ai=False)
-    new_user = User(
-        id=new_human_id,
-        email=user_data["email"],
-        hashed_password=hashed_pw,
-        name=user_data["name"],
-        goal=user_data["goal"],
-        target_date=user_data.get("target_date"),
-        auth_token=issue_token(),
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    assign_group_logic(db, new_user)
+    try:
+        salt = bcrypt.gensalt()
+        hashed_pw = bcrypt.hashpw(user_data["password"].encode("utf-8"), salt).decode(
+            "utf-8"
+        )
+        new_human_id = get_custom_id(db, is_ai=False)
+        new_user = User(
+            id=new_human_id,
+            email=user_data["email"],
+            hashed_password=hashed_pw,
+            name=user_data["name"],
+            goal=user_data["goal"],
+            target_date=user_data.get("target_date"),
+            auth_token=issue_token(),
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        assign_group_logic(db, new_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"register failed: {e}")
+        raise HTTPException(status_code=500, detail="Registration failed. Please retry.")
     # ✨ 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
     return {
         "user": {"id": new_user.id, "name": new_user.name, "goal": new_user.goal},

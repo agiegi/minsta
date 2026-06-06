@@ -787,7 +787,15 @@
 
     <div id="profileModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0;">👤 プロフィール画像の設定</h3>
+            <h3 style="margin-top:0;">👤 プロフィールの設定</h3>
+            <div style="margin-bottom: 20px;">
+                <label style="display:block; font-size:13px; color:#7A6F5D; margin-bottom:6px;">ニックネーム</label>
+                <input type="text" id="nameInput" maxlength="20" placeholder="ニックネーム"
+                    style="width:100%; padding:10px; box-sizing:border-box; border:1px solid #EAE5D9; border-radius:8px; font-size:14px;">
+                <button onclick="saveName()" style="background: #4CAF50; margin-top:10px; width:100%;">ニックネームを保存</button>
+            </div>
+            <hr style="border:none; border-top:1px solid #EAE5D9; margin:16px 0;">
+            <h3 style="margin-top:0; font-size:15px;">👤 プロフィール画像の設定</h3>
             <input type="file" id="profileImageInput" accept="image/*" onchange="previewProfileImage(event)"
                 style="font-size: 12px;">
             <div style="text-align:center; margin-top:10px;">
@@ -795,8 +803,8 @@
                     style="width:100px; height:100px; object-fit:cover; border-radius:50%; border: 3px solid #EAE5D9;">
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button onclick="closeProfileModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
-                <button onclick="saveProfileImage()" style="background: #4CAF50; margin-top:0;">保存</button>
+                <button onclick="closeProfileModal()" style="background: #CAC1AC; margin-top:0;">閉じる</button>
+                <button onclick="saveProfileImage()" style="background: #4CAF50; margin-top:0;">画像を保存</button>
             </div>
         </div>
     </div>
@@ -1288,6 +1296,7 @@
                     if (res.ok) {
                         const me = await res.json();
                         currentUserId = me.id;
+                        currentUserName = me.name || "";
                         document.getElementById('displayUserId').innerText = currentUserId;
                         document.getElementById('authScreen').style.display = 'none';
                         document.getElementById('dashboard').style.display = 'block';
@@ -1444,6 +1453,8 @@
             const currentImg = document.getElementById('myProfileIcon').src;
             document.getElementById('profilePreview').src = currentImg;
             document.getElementById('profileImageInput').value = "";
+            const nameInput = document.getElementById('nameInput');
+            if (nameInput && currentUserName) nameInput.value = currentUserName;
             document.getElementById('profileModal').style.display = 'flex';
         }
         function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
@@ -1484,6 +1495,26 @@
                 fetchData();
                 alert("プロフィール画像を更新しました！");
             } catch (e) { alert("更新に失敗しました"); }
+        }
+
+        async function saveName() {
+            const newName = document.getElementById('nameInput').value.trim();
+            if (!newName) { alert("ニックネームを入力してください"); return; }
+            try {
+                const res = await apiFetch(`/users/${currentUserId}/name`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || "更新に失敗しました");
+                }
+                const data = await res.json();
+                currentUserName = data.name;
+                fetchData();
+                alert("ニックネームを更新しました！");
+            } catch (e) { alert(e.message || "更新に失敗しました"); }
         }
 
 

@@ -654,6 +654,29 @@ async def update_profile_image(
     return {"message": "Profile image updated"}
 
 
+@app.post("/users/{user_id}/name")
+async def update_name(
+    user_id: int,
+    name_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    new_name = (name_data.get("name") or "").strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="ニックネームを入力してください")
+    if len(new_name) > 20:
+        raise HTTPException(status_code=400, detail="ニックネームは20文字以内にしてください")
+    user.name = new_name
+    db.commit()
+    if user.group_id:
+        await manager.broadcast_to_group(user.group_id, "update")
+    return {"message": "Name updated", "name": user.name}
+
+
 @app.get("/groups/{group_id}/members")
 def get_members(
     group_id: int,

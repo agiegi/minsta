@@ -308,7 +308,11 @@ def adjust_group_members(db: Session, group_id: int, goal: str):
             total += 1
         while total > 3 and ais:
             ai_to_remove = ais.pop()
-            db.delete(ai_to_remove)
+            # AIを物理削除(db.delete)すると、そのAIが過去にmessages等へ
+            # 投稿していた場合に外部キー制約違反(ForeignKeyViolation)で失敗し、
+            # AIが抜けず4人のまま残る/登録が中途半端に成功する原因になる。
+            # そのため削除せず、group_idをNULLにしてグループから外すだけにする。
+            ai_to_remove.group_id = None
             total -= 1
         db.commit()
     except Exception as e:
@@ -318,21 +322,30 @@ def adjust_group_members(db: Session, group_id: int, goal: str):
 
 
 def assign_group_logic(db: Session, user: User):
-    potential_groups = db.query(Group).filter(Group.goal == user.goal).all()
-    target_group = None
-    for g in potential_groups:
-        humans = db.query(User).filter(User.group_id == g.id, User.is_ai == False).all()
-        if len(humans) < 3:
-            target_group = g
-            break
-    if not target_group:
-        target_group = Group(goal=user.goal)
-        db.add(target_group)
+    try:
+        potential_groups = db.query(Group).filter(Group.goal == user.goal).all()
+        target_group = None
+        for g in potential_groups:
+            humans = (
+                db.query(User)
+                .filter(User.group_id == g.id, User.is_ai == False)
+                .all()
+            )
+            if len(humans) < 3:
+                target_group = g
+                break
+        if not target_group:
+            target_group = Group(goal=user.goal)
+            db.add(target_group)
+            db.commit()
+            db.refresh(target_group)
+        user.group_id = target_group.id
         db.commit()
-        db.refresh(target_group)
-    user.group_id = target_group.id
-    db.commit()
-    adjust_group_members(db, target_group.id, target_group.goal)
+        adjust_group_members(db, target_group.id, target_group.goal)
+    except Exception as e:
+        db.rollback()
+        print(f"assign_group_logic failed (user {user.id}): {e}")
+        raise
 
 
 # --- 毎晩23:59に作動するサボり点検バッチ ---
@@ -486,6 +499,7 @@ def register(user_data: dict, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_data["email"]).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
+    new_user = None
     try:
         salt = bcrypt.gensalt()
         hashed_pw = bcrypt.hashpw(user_data["password"].encode("utf-8"), salt).decode(
@@ -504,12 +518,25 @@ def register(user_data: dict, db: Session = Depends(get_db)):
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
+        # チーム割り当て。ここで失敗すると、上で保存済みのユーザーだけが
+        # 中途半端に残り「エラーなのに登録成功」状態になる（重複登録の原因）。
+        # そのため、失敗時は保存したユーザーを削除して整合性を戻す。
         assign_group_logic(db, new_user)
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         print(f"register failed: {e}")
+        # 中途半端に保存されたユーザーを後始末する
+        if new_user is not None:
+            try:
+                saved = db.query(User).filter(User.id == new_user.id).first()
+                if saved is not None:
+                    db.delete(saved)
+                    db.commit()
+            except Exception as cleanup_error:
+                db.rollback()
+                print(f"register cleanup failed: {cleanup_error}")
         raise HTTPException(status_code=500, detail="Registration failed. Please retry.")
     # ✨ 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
     return {

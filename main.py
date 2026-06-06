@@ -400,6 +400,26 @@ async def daily_check_task():
                                     manager.broadcast_to_group(old_group_id, "update")
                                 )
                     db.commit()
+
+                    # 全グループの人数点検: 人間が1人以上いるグループが
+                    # 3人(人間+AI)を保てているか確認し、過不足があれば整える。
+                    # サボりキックやDB直操作などで人数が狂っても、ここで自動修復される。
+                    # （人間ゼロの抜け殻グループは対象外。無駄なAI補充をしないため）
+                    all_groups = db.query(Group).all()
+                    for g in all_groups:
+                        members = (
+                            db.query(User).filter(User.group_id == g.id).all()
+                        )
+                        human_count = len([m for m in members if not m.is_ai])
+                        if human_count >= 1 and len(members) != 3:
+                            try:
+                                adjust_group_members(db, g.id, g.goal)
+                                asyncio.create_task(
+                                    manager.broadcast_to_group(g.id, "update")
+                                )
+                            except Exception as fix_error:
+                                print(f"group {g.id} の人数調整に失敗: {fix_error}")
+                    db.commit()
                 finally:
                     db.close()
                 await asyncio.sleep(65)

@@ -1088,6 +1088,35 @@
         let synthDest = null;
         let synthAudioEl = null;
 
+        // iOS対策: 通知・着信・ロック・他アプリ切替などでオーディオが中断されると、
+        // 自動では戻らない。画面復帰時やタップ時に、選択中の環境音を再開する。
+        function resumeAudioIfNeeded() {
+            try {
+                // 鳴らすべき状態か（音が選ばれ、タイマー稼働中で、一時停止でない）を確認
+                const sel = document.getElementById('bgmSelect');
+                if (!sel || sel.value === 'none') return;
+                if (!timerObj || isPaused) return;
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                // 中断で止まっていれば、選択中のBGMを鳴らし直す
+                if (synthAudioEl && synthAudioEl.paused) {
+                    playCurrentBGM();
+                } else if (!synthAudioEl) {
+                    playCurrentBGM();
+                }
+            } catch (e) {
+                console.log('resumeAudioIfNeeded:', e);
+            }
+        }
+        // 通知やロックから戻ってきたとき
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') resumeAudioIfNeeded();
+        });
+        window.addEventListener('focus', resumeAudioIfNeeded);
+        // 中断後、ユーザーが画面に触れたときにも復帰を試みる（iOSはタップ起点だと確実）
+        document.addEventListener('touchend', resumeAudioIfNeeded);
+
         function initAudioCtx() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();

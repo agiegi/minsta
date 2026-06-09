@@ -415,6 +415,30 @@
             margin-top: 6px;
             word-break: break-all;
         }
+    
+        /* === 門出（卒業）演出オーバーレイ === */
+        #monodeOverlay { position: fixed; inset: 0; z-index: 9999; display: none; background:#000; }
+        #monodeOverlay .mn-scene { position: relative; width: 100%; height: 100%; max-width: 500px; margin: 0 auto; overflow: hidden; perspective: 500px; perspective-origin: 50% 50%; background: linear-gradient(to bottom, #eaf3fb 0%, #fff6f8 60%, #a4c688 100%); }
+        #monodeOverlay .mn-camera { width: 100%; height: 100%; transform-style: preserve-3d; animation: mnWalkBob 1.6s infinite ease-in-out; }
+        @keyframes mnWalkBob { 0%,100% { transform: translateY(0px); } 25% { transform: translateY(4px) rotateZ(0.2deg); } 50% { transform: translateY(0px); } 75% { transform: translateY(4px) rotateZ(-0.2deg); } }
+        #monodeOverlay .mn-world { width: 100%; height: 100%; transform-style: preserve-3d; animation: mnStroll 10s linear forwards; }
+        @keyframes mnStroll { 0% { transform: translateZ(0px); } 100% { transform: translateZ(3000px); } }
+        #monodeOverlay .mn-floor { position: absolute; left: 50%; top: 50%; width: 8000px; height: 16000px; margin-left: -4000px; margin-top: -8000px; transform-origin: 50% 50%; transform: translateY(150px) rotateX(89.99deg); background: repeating-linear-gradient(to bottom, transparent, transparent 100px, rgba(0,0,0,0.02) 100px, rgba(0,0,0,0.02) 200px), linear-gradient(to right, #8fb56d 0%, #a4c688 40%, #d5bd9f 46%, #ead8bf 50%, #d5bd9f 54%, #a4c688 60%, #8fb56d 100%); }
+        #monodeOverlay .mn-tree { position: absolute; left: 50%; top: 50%; width: 800px; height: 800px; margin-left: -400px; margin-top: -800px; transform-style: preserve-3d; }
+        #monodeOverlay .mn-tree svg { width: 100%; height: 100%; }
+        #monodeOverlay .mn-end-light { position: absolute; left: 50%; top: 50%; width: 3000px; height: 3000px; margin-left: -1500px; margin-top: -1500px; background: radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0.95) 20%, rgba(255,255,255,0) 60%); transform: translateY(150px) translateZ(-4000px); opacity: 0.9; }
+        #monodeOverlay .mn-whiteout { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #ffffff; opacity: 0; pointer-events: none; z-index: 20; animation: mnWhiteout 10s ease-in forwards; }
+        @keyframes mnWhiteout { 0%,70% { opacity: 0; } 90%,100% { opacity: 1; } }
+        #monodeOverlay .mn-petals { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 10; }
+        #monodeOverlay .mn-petal { position: absolute; top: -10vh; width: 10px; height: 16px; background: linear-gradient(135deg, #ffffff, #f5d6df); border-radius: 60% 0 60% 0; opacity: 0.8; animation: mnFall linear infinite; }
+        @keyframes mnFall { 0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(var(--scale)); } 100% { transform: translate3d(-20px, 110vh, 0) rotate(360deg) scale(var(--scale)); } }
+        #monodeOverlay .mn-message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -40%); width: 100%; text-align: center; opacity: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; animation: mnMsg 2.5s ease-out 9.5s forwards; }
+        @keyframes mnMsg { 0% { opacity: 0; transform: translate(-50%, -45%); } 100% { opacity: 1; transform: translate(-50%, -50%); } }
+        #monodeOverlay .mn-main { font-family: 'Kaisei Decol', serif; font-size: 1.7rem; font-weight: 700; color: #54744c; letter-spacing: 0.15em; line-height: 1.6; }
+        #monodeOverlay .mn-sub { margin-top: 1.2rem; font-size: 0.85rem; color: #7a9070; line-height: 2; letter-spacing: 0.05em; }
+        #monodeOverlay .mn-seal { margin-top: 1.6rem; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #a6dca0, #6fb86a); display: grid; place-items: center; font-size: 26px; box-shadow: 0 8px 22px rgba(110,184,106,0.45); }
+        #monodeOverlay .mn-next { margin-top: 2rem; padding: 12px 40px; border: none; border-radius: 24px; background: linear-gradient(135deg, #f0a8c4, #e58aae); color: #fff; font-family: 'Zen Maru Gothic', sans-serif; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.1em; cursor: pointer; box-shadow: 0 6px 18px rgba(229,138,174,0.4); }
+
     </style>
 </head>
 
@@ -640,6 +664,9 @@
                     <p onclick="openGoalModal()"
                         style="font-size:12px; cursor:pointer; text-decoration:underline; color:#2E7D32; margin:0; font-weight:bold;">
                         ⚙️ 目標・期日</p>
+                    <p onclick="confirmGraduate()"
+                        style="font-size:12px; cursor:pointer; text-decoration:underline; color:#E58AAE; margin:6px 0 0 0; font-weight:bold;">
+                        🌸 門出テスト（仮）</p>
                 </div>
             </div>
 
@@ -785,6 +812,42 @@
         </div>
     </div>
 
+    <div id="monodeOverlay">
+        <div class="mn-scene">
+            <div class="mn-camera">
+                <div class="mn-world" id="mnWorld">
+                    <div class="mn-floor"></div>
+                    <div class="mn-end-light"></div>
+                </div>
+            </div>
+            <div class="mn-petals" id="mnPetals"></div>
+            <div class="mn-whiteout"></div>
+            <div class="mn-message">
+                <div class="mn-main">目標達成おめでとう</div>
+                <div class="mn-sub">この森で重ねた日々が<br>あなたをここまで運びました<br>新しい道へいってらっしゃい</div>
+                <div class="mn-seal">🌸</div>
+                <button class="mn-next" onclick="monodeNext()">次へ</button>
+            </div>
+        </div>
+    </div>
+    <svg style="display:none;">
+        <defs>
+            <g id="mn-cherry-tree">
+                <path d="M380,800 Q400,600 400,500 Q400,600 420,800 Z" fill="#6b5b58" />
+                <path d="M400,600 Q430,550 460,500" stroke="#6b5b58" stroke-width="8" fill="none"/>
+                <path d="M400,620 Q360,570 330,520" stroke="#6b5b58" stroke-width="8" fill="none"/>
+                <circle cx="400" cy="450" r="140" fill="#fbd3de" opacity="0.9" />
+                <circle cx="300" cy="500" r="120" fill="#f1b5c9" opacity="0.85" />
+                <circle cx="500" cy="480" r="130" fill="#ebd1d8" opacity="0.85" />
+                <circle cx="350" cy="350" r="110" fill="#ffeaf0" opacity="0.95" />
+                <circle cx="450" cy="370" r="120" fill="#f4c6d3" opacity="0.9" />
+                <circle cx="560" cy="330" r="120" fill="#fdf0f3" opacity="0.9" />
+                <circle cx="600" cy="430" r="100" fill="#fbd8e1" opacity="0.85" />
+                <circle cx="420" cy="280" r="130" fill="#f5d6df" opacity="0.95" />
+            </g>
+        </defs>
+    </svg>
+
     <div id="memberDetailModal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <div id="memberDetailIcon" style="display:flex; justify-content:center; align-items:center; height:80px; margin-bottom:10px;"></div>
@@ -823,8 +886,8 @@
 
     <div id="goalModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0;">🎯 目標の変更</h3>
-            <p style="font-size:11px; color:#E53935; font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
+            <h3 id="goalModalTitle" style="margin-top:0;">🎯 目標の変更</h3>
+            <p id="goalModalNote" style="font-size:11px; color:#E53935; font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
             <input type="text" id="editGoal" placeholder="新しい目標">
             <label style="font-size: 11px; color: #8D6E63; display: block; margin: 10px 0 2px 5px;">📅 新しい期日</label>
             <input type="date" id="editDate" style="color: #5D4037;">
@@ -2467,7 +2530,7 @@
             }
         }
 
-        function openGoalModal() { document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; document.getElementById('goalModal').style.display = 'flex'; }
+        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="🎯 目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; document.getElementById('goalModal').style.display = 'flex'; }
         function closeGoalModal() { document.getElementById('goalModal').style.display = 'none'; }
 
         async function updateGoal() {
@@ -2475,6 +2538,80 @@
             if (!newGoal) return alert("目標を入力してください");
             await apiFetch(`/users/${currentUserId}/goal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: newGoal, target_date: newDate || null }) });
             closeGoalModal(); alert("目標を更新しました！"); document.getElementById('groupArea').style.display = 'none'; fetchData();
+        }
+
+    
+        // === 門出（卒業）演出 ===
+        function startMonode() {
+            const overlay = document.getElementById('monodeOverlay');
+            const world = document.getElementById('mnWorld');
+            // 木を作り直す（再生のたびにリセット）
+            world.querySelectorAll('.mn-tree').forEach(t => t.remove());
+            const treeCount = 45, forestDepth = 4000, groundLevelY = 150;
+            for (let i = 0; i < treeCount; i++) {
+                const z = -(i * (forestDepth / treeCount)) - (Math.random() * 80);
+                const isLeft = i % 2 === 0;
+                const xOffset = 200 + Math.random() * 100;
+                const x = isLeft ? -xOffset : xOffset;
+                const tree = document.createElement('div');
+                tree.className = 'mn-tree';
+                tree.style.transform = `translate3d(${x}px, ${groundLevelY}px, ${z}px) scaleX(${isLeft ? 1 : -1})`;
+                tree.innerHTML = '<svg><use href="#mn-cherry-tree" /></svg>';
+                world.appendChild(tree);
+            }
+            // 花びら
+            const petals = document.getElementById('mnPetals');
+            petals.innerHTML = '';
+            for (let i = 0; i < 70; i++) {
+                const p = document.createElement('div');
+                p.className = 'mn-petal';
+                p.style.left = (Math.random() * 100) + '%';
+                p.style.animationDelay = (Math.random() * 8) + 's';
+                p.style.animationDuration = (3.5 + Math.random() * 4.5) + 's';
+                p.style.setProperty('--scale', 0.4 + Math.random() * 0.6);
+                p.style.opacity = 0.5 + Math.random() * 0.5;
+                petals.appendChild(p);
+            }
+            // アニメーションをリセットして再生（オーバーレイ表示）
+            overlay.style.display = 'block';
+            // CSSアニメは display 切替で先頭から再生される
+        }
+
+        // 「巣立つ」確定 → 卒業処理を実行し、演出を再生
+        async function confirmGraduate() {
+            if (!confirm('巣立ちますか？\n（目標を達成し、今のチームを卒業します）')) {
+                return;
+            }
+            try {
+                const res = await apiFetch(`/users/${currentUserId}/graduate`, { method: 'POST' });
+                if (!res.ok) throw new Error('graduate failed');
+            } catch (e) {
+                alert('処理に失敗しました。少し待って、もう一度お試しください。');
+                return;
+            }
+            // 卒業処理が成功したら、演出を再生
+            // 目標変更モーダルなどが開いていれば閉じる
+            const gm = document.getElementById('goalModal');
+            if (gm) gm.style.display = 'none';
+            startMonode();
+        }
+
+        // 演出後「次へ」→ オーバーレイを閉じ、次の目標設定へ
+        function monodeNext() {
+            document.getElementById('monodeOverlay').style.display = 'none';
+            // 既存の目標変更モーダルを「次の目標設定」として開く
+            openGoalModalForNext();
+        }
+
+        // 門出後：次の目標を立てるために、目標モーダルを「新しい目標」用に開く
+        function openGoalModalForNext() {
+            document.getElementById('editGoal').value = "";
+            document.getElementById('editDate').value = "";
+            const title = document.getElementById('goalModalTitle');
+            const note = document.getElementById('goalModalNote');
+            if (title) title.innerText = "🌱 次の目標を立てましょう";
+            if (note) note.innerText = "新しい目標を設定すると、その仲間の森に加わります。";
+            document.getElementById('goalModal').style.display = 'flex';
         }
 
     </script>

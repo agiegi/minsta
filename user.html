@@ -11,10 +11,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="みんスタ">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Kaisei+Decol:wght@400;700&display=swap" rel="stylesheet">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            font-family: 'Times New Roman', "Georgia", serif;
+            font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Quicksand', sans-serif;
             background: radial-gradient(circle, #EAE5D9 0%, #CAC1AC 100%);
             margin: 0;
             display: flex;
@@ -2632,7 +2636,7 @@
             document.getElementById('editDate').value = "";
             const title = document.getElementById('goalModalTitle');
             const note = document.getElementById('goalModalNote');
-            if (title) title.innerText = "次の目標を立てましょう";
+            if (title) title.innerText = "🌱 次の目標を立てましょう";
             if (note) note.innerText = "新しい目標を設定すると、その仲間の森に加わります。";
             const a = document.getElementById('goalAchieveArea');
             if (a) a.style.display = 'none';

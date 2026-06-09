@@ -98,6 +98,12 @@ class User(Base):
     is_ai = Column(Boolean, default=False)
     strike_count = Column(Integer, default=0)
     profile_image = Column(String, nullable=True)
+    # ✨ 門出（卒業）を一度でも経験したか。桜バッジの表示に使う。
+    has_graduated = Column(Boolean, default=False)
+    # ✨ 称号バッジ（運営が手動で付与）。開発者=大樹 / アドバイザー=雫 / テスター=双葉
+    is_developer = Column(Boolean, default=False)
+    is_advisor = Column(Boolean, default=False)
+    is_tester = Column(Boolean, default=False)
     # ✨ 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
     auth_token = Column(String, nullable=True, index=True)
 
@@ -607,6 +613,10 @@ def get_me(current_user: User = Depends(get_current_user)):
         "target_date": current_user.target_date,
         "strike_count": current_user.strike_count,
         "profile_image": current_user.profile_image,
+        "has_graduated": current_user.has_graduated,
+        "is_developer": current_user.is_developer,
+        "is_advisor": current_user.is_advisor,
+        "is_tester": current_user.is_tester,
     }
 
 
@@ -634,6 +644,43 @@ async def update_goal(
     assign_group_logic(db, user)
     await manager.broadcast_to_group(user.group_id, "update")
     return {"message": "Goal updated"}
+
+
+@app.post("/users/{user_id}/graduate")
+async def graduate(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_self(current_user, user_id)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        old_group_id = user.group_id
+        # 達成の記録（桜バッジ）を立てる
+        user.has_graduated = True
+        # チームへ祝福の別れメッセージを残す
+        if old_group_id:
+            farewell = Message(
+                group_id=old_group_id,
+                user_id=user.id,
+                content=f"🌸【システム】{user.name}さんが目標を達成し、森から巣立ちました。おめでとう！",
+            )
+            db.add(farewell)
+        db.commit()
+        # チームから外す（卒業）。残りは夜間バッチ/調整で3人に戻る。
+        if old_group_id:
+            user.group_id = None
+            user.strike_count = 0
+            db.commit()
+            adjust_group_members(db, old_group_id, user.goal)
+            await manager.broadcast_to_group(old_group_id, "update")
+    except Exception as e:
+        db.rollback()
+        print(f"graduate failed (user {user_id}): {e}")
+        raise HTTPException(status_code=500, detail="Graduation failed. Please retry.")
+    return {"message": "Graduated", "has_graduated": True}
 
 
 @app.post("/users/{user_id}/profile_image")
@@ -722,6 +769,10 @@ def get_members(
                 "icon": icon,
                 "profile_image": m.profile_image,
                 "is_ai": m.is_ai,
+                "has_graduated": m.has_graduated,
+                "is_developer": m.is_developer,
+                "is_advisor": m.is_advisor,
+                "is_tester": m.is_tester,
             }
         )
     return res

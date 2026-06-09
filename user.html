@@ -664,9 +664,6 @@
                     <p onclick="openGoalModal()"
                         style="font-size:12px; cursor:pointer; text-decoration:underline; color:#2E7D32; margin:0; font-weight:bold;">
                         ⚙️ 目標・期日</p>
-                    <p onclick="confirmGraduate()"
-                        style="font-size:12px; cursor:pointer; text-decoration:underline; color:#E58AAE; margin:6px 0 0 0; font-weight:bold;">
-                        🌸 門出テスト（仮）</p>
                 </div>
             </div>
 
@@ -680,6 +677,13 @@
                 <div id="daysLeft" style="font-size: 36px; font-weight: bold; color: #0D47A1; margin: 5px 0;">あと -- 日
                 </div>
                 <div id="goalDateText" style="font-size: 12px; color: #1976D2;"></div>
+            </div>
+
+            <div id="monodePrompt" onclick="confirmGraduate()"
+                style="display:none; cursor:pointer; text-align:center; margin-bottom:15px; padding:16px;
+                       border-radius:15px; background:linear-gradient(135deg,#fde4ee,#f8cdde);
+                       color:#b85a82; font-weight:bold; font-size:14px; line-height:1.7;
+                       box-shadow:0 4px 14px rgba(229,138,174,0.3);">
             </div>
 
             <div id="groupArea" class="card" style="display: none; background: #E8F5E9; border: 1px solid #C8E6C9;">
@@ -894,6 +898,11 @@
             <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button onclick="closeGoalModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
                 <button onclick="updateGoal()" style="background: #4CAF50; margin-top:0;">変更する</button>
+            </div>
+            <div id="goalAchieveArea" style="margin-top:16px; padding-top:14px; border-top:1px solid #EAE5D9;">
+                <p style="font-size:11px; color:#8D6E63; margin:0 0 8px 0;">目標を達成しましたか？</p>
+                <button onclick="closeGoalModal(); confirmGraduate();"
+                    style="background: linear-gradient(135deg, #f0a8c4, #e58aae); margin-top:0;">🌸 目標を達成した（巣立つ）</button>
             </div>
         </div>
     </div>
@@ -2405,6 +2414,20 @@
                 const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
                 document.getElementById('daysLeft').innerText = diffDays > 0 ? `あと ${diffDays} 日` : diffDays === 0 ? "✨ 本日が期日です！ ✨" : `${Math.abs(diffDays)}日 経過`;
                 document.getElementById('goalDateText').innerText = `設定日: ${currentTargetDate.replace(/-/g, '/')}`;
+
+                // 予定日トリガー: 当日以降になったら、門出の案内を出す
+                const monodePrompt = document.getElementById('monodePrompt');
+                if (monodePrompt) {
+                    if (diffDays === 0) {
+                        monodePrompt.innerHTML = "🌸 予定日当日です！<br>ここをタップして、行く末を決めましょう";
+                        monodePrompt.style.display = 'block';
+                    } else if (diffDays < 0) {
+                        monodePrompt.innerHTML = "🌸 予定日を過ぎました。<br>ここをタップして、行く末を決めましょう";
+                        monodePrompt.style.display = 'block';
+                    } else {
+                        monodePrompt.style.display = 'none';
+                    }
+                }
             }
 
             // --- 称号（累計学習時間） ---
@@ -2530,7 +2553,7 @@
             }
         }
 
-        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="🎯 目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; document.getElementById('goalModal').style.display = 'flex'; }
+        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="🎯 目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; const a=document.getElementById('goalAchieveArea'); if(a)a.style.display='block'; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; document.getElementById('goalModal').style.display = 'flex'; }
         function closeGoalModal() { document.getElementById('goalModal').style.display = 'none'; }
 
         async function updateGoal() {
@@ -2609,8 +2632,10 @@
             document.getElementById('editDate').value = "";
             const title = document.getElementById('goalModalTitle');
             const note = document.getElementById('goalModalNote');
-            if (title) title.innerText = "🌱 次の目標を立てましょう";
+            if (title) title.innerText = "次の目標を立てましょう";
             if (note) note.innerText = "新しい目標を設定すると、その仲間の森に加わります。";
+            const a = document.getElementById('goalAchieveArea');
+            if (a) a.style.display = 'none';
             document.getElementById('goalModal').style.display = 'flex';
         }
 

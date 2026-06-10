@@ -327,6 +327,73 @@ def adjust_group_members(db: Session, group_id: int, goal: str):
         raise
 
 
+def cleanup_floating_ais(db: Session):
+    """✨ 浮いたAI（group_id=NULLのAIメンバー）を物理削除する掃除処理。
+
+    adjust_group_membersはAIを外す際にgroup_idをNULLにするだけなので、
+    放置すると浮いたAIがDBに無限に溜まっていく。AIは一度浮くと二度と
+    グループへ戻らない（補充は常に新規作成）ため、いつ消しても安全。
+    外部キー制約があるため reactions → messages → users の順で消す。
+    （reports/booksはAIは作らないが、万一あると削除が永遠に失敗し続ける
+      ため、念のため同じトランザクションで掃除する）
+    戻り値: (削除したAIの数, 掲示板の表示が変わるgroup_idのset)
+    """
+    floating_ais = (
+        db.query(User).filter(User.is_ai == True, User.group_id == None).all()
+    )
+    affected_groups = set()
+    deleted_count = 0
+    for ai in floating_ais:
+        # 二重ガード: 人間は何があっても絶対に消さない
+        if not ai.is_ai:
+            continue
+        try:
+            # このAIの投稿が残っている掲示板（削除後に画面更新を流す対象）
+            ai_msg_group_ids = [
+                gid
+                for (gid,) in db.query(Message.group_id)
+                .filter(Message.user_id == ai.id)
+                .distinct()
+                .all()
+                if gid is not None
+            ]
+            ai_message_ids = [
+                mid
+                for (mid,) in db.query(Message.id)
+                .filter(Message.user_id == ai.id)
+                .all()
+            ]
+            # 1) reactions: AIの投稿に付いたもの + AI自身が付けたもの（通常は無い）
+            if ai_message_ids:
+                db.query(Reaction).filter(
+                    Reaction.message_id.in_(ai_message_ids)
+                ).delete(synchronize_session=False)
+            db.query(Reaction).filter(Reaction.user_id == ai.id).delete(
+                synchronize_session=False
+            )
+            # 2) messages
+            db.query(Message).filter(Message.user_id == ai.id).delete(
+                synchronize_session=False
+            )
+            # 3) reports → books（AIは作らないはずだが念のため。reportsが先）
+            db.query(Report).filter(Report.user_id == ai.id).delete(
+                synchronize_session=False
+            )
+            db.query(Book).filter(Book.user_id == ai.id).delete(
+                synchronize_session=False
+            )
+            # 4) users（本体）
+            db.delete(ai)
+            db.commit()
+            deleted_count += 1
+            affected_groups.update(ai_msg_group_ids)
+        except Exception as e:
+            # 1体の失敗で掃除全体を止めない（失敗分は翌晩また試行される）
+            db.rollback()
+            print(f"cleanup_floating_ais failed (ai {ai.id}): {e}")
+    return deleted_count, affected_groups
+
+
 def assign_group_logic(db: Session, user: User):
     try:
         potential_groups = db.query(Group).filter(Group.goal == user.goal).all()
@@ -426,6 +493,20 @@ async def daily_check_task():
                             except Exception as fix_error:
                                 print(f"group {g.id} の人数調整に失敗: {fix_error}")
                     db.commit()
+
+                    # ✨ 浮いたAIの掃除: 上の人数調整で外れた分も含めて、
+                    # group_id=NULLのAIを毎晩ここで物理削除する。
+                    # 失敗してもバッチ全体は止めない（翌晩リトライされる）。
+                    try:
+                        cleaned, touched_groups = cleanup_floating_ais(db)
+                        if cleaned:
+                            print(f"🧹 浮いたAIを{cleaned}体掃除しました")
+                            for gid in touched_groups:
+                                asyncio.create_task(
+                                    manager.broadcast_to_group(gid, "update")
+                                )
+                    except Exception as clean_error:
+                        print(f"浮いたAI掃除に失敗: {clean_error}")
                 finally:
                     db.close()
                 await asyncio.sleep(65)

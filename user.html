@@ -874,7 +874,9 @@
         <div class="modal-content">
             <h3 id="goalModalTitle" style="margin-top:0;">🎯 目標の変更</h3>
             <p id="goalModalNote" style="font-size:11px; color:#E53935; font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
-            <input type="text" id="editGoal" placeholder="新しい目標">
+            <input type="text" id="editGoal" placeholder="🔍 新しい目標を入力・検索"
+                oninput="filterTagsIn('editGoal', 'editTagsContainer')">
+            <div class="goal-tags-container" id="editTagsContainer" style="max-height:220px;"></div>
             <label style="font-size: 11px; color: #8D6E63; display: block; margin: 10px 0 2px 5px;">📅 新しい期日</label>
             <input type="date" id="editDate" style="color: #5D4037;">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
@@ -1592,9 +1594,10 @@
             };
         }
 
-        function filterTags() {
-            const query = document.getElementById('regGoal').value.toLowerCase();
-            const groups = document.getElementById('tagsContainer').querySelectorAll('.tag-category-group');
+        // 目標タグの検索フィルタ（登録画面・目標変更モーダルの両方で使う汎用版）
+        function filterTagsIn(inputId, containerId) {
+            const query = document.getElementById(inputId).value.toLowerCase();
+            const groups = document.getElementById(containerId).querySelectorAll('.tag-category-group');
             groups.forEach(group => {
                 const tags = group.querySelectorAll('.goal-tag');
                 let hasVisibleTag = false;
@@ -1607,11 +1610,34 @@
             });
         }
 
-        function setGoal(text) {
-            document.getElementById('regGoal').value = text.replace('#', '');
-            filterTags();
-            document.getElementById('regGoal').style.backgroundColor = "#E8F5E9";
-            setTimeout(() => document.getElementById('regGoal').style.backgroundColor = "#FFFEF8", 300);
+        function filterTags() { filterTagsIn('regGoal', 'tagsContainer'); }
+
+        function setGoalFor(inputId, containerId, text) {
+            const el = document.getElementById(inputId);
+            el.value = text.replace('#', '');
+            filterTagsIn(inputId, containerId);
+            el.style.backgroundColor = "#E8F5E9";
+            setTimeout(() => el.style.backgroundColor = "#FFFEF8", 300);
+        }
+
+        function setGoal(text) { setGoalFor('regGoal', 'tagsContainer', text); }
+
+        // ✨ 表記ゆれ対策: 目標変更モーダルにも登録画面と同じタグ一覧を出す。
+        // 一覧の実体は登録画面の1箇所だけにし、モーダルを開くたびに複製する
+        // （将来タグを追加しても自動で両方に反映される）。
+        function setupEditGoalTags() {
+            const src = document.getElementById('tagsContainer');
+            const dst = document.getElementById('editTagsContainer');
+            if (!src || !dst) return;
+            dst.innerHTML = src.innerHTML;
+            // 複製元のフィルタ状態(display:none)をリセットして全タグ表示にする
+            dst.querySelectorAll('.tag-category-group').forEach(g => g.style.display = 'block');
+            dst.querySelectorAll('.goal-tag').forEach(tag => {
+                tag.style.display = 'inline-block';
+                const t = tag.innerText;
+                // 複製されたonclick(setGoal=登録画面向け)を、モーダル向けに差し替える
+                tag.onclick = () => setGoalFor('editGoal', 'editTagsContainer', t);
+            });
         }
 
         function toggleAuthMode() {
@@ -1624,7 +1650,7 @@
             const email = document.getElementById('regEmail').value;
             const password = document.getElementById('regPassword').value;
             const name = document.getElementById('regName').value;
-            const goal = document.getElementById('regGoal').value;
+            const goal = document.getElementById('regGoal').value.trim();
             const date = document.getElementById('regDate').value;
 
             if (!email || !password || !name || !goal) return alert("必須項目をすべて入力してください");
@@ -2652,11 +2678,11 @@
             }
         }
 
-        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="🎯 目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; const a=document.getElementById('goalAchieveArea'); if(a)a.style.display='block'; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; document.getElementById('goalModal').style.display = 'flex'; }
+        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="🎯 目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; const a=document.getElementById('goalAchieveArea'); if(a)a.style.display='block'; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; setupEditGoalTags(); document.getElementById('goalModal').style.display = 'flex'; }
         function closeGoalModal() { document.getElementById('goalModal').style.display = 'none'; }
 
         async function updateGoal() {
-            const newGoal = document.getElementById('editGoal').value, newDate = document.getElementById('editDate').value;
+            const newGoal = document.getElementById('editGoal').value.trim(), newDate = document.getElementById('editDate').value;
             if (!newGoal) return alert("目標を入力してください");
             await apiFetch(`/users/${currentUserId}/goal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: newGoal, target_date: newDate || null }) });
             closeGoalModal(); alert("目標を更新しました！"); document.getElementById('groupArea').style.display = 'none'; fetchData();
@@ -2719,6 +2745,7 @@
             if (note) note.innerText = "新しい目標を設定すると、その仲間の森に加わります。";
             const a = document.getElementById('goalAchieveArea');
             if (a) a.style.display = 'none';
+            setupEditGoalTags();
             document.getElementById('goalModal').style.display = 'flex';
         }
 

@@ -286,6 +286,15 @@ AI_ENCOURAGEMENTS = [
     "継続は力なり、ですね。応援しています📣",
 ]
 
+# ✨ オンボーディング: チーム参加時にAIが投稿する歓迎メッセージ。
+# 登録直後の掲示板が無言だと何をすべきか分からないため、名前入りで迎えて
+# 最初の行動（タイマーで学習→報告）を案内する。
+AI_WELCOMES = [
+    "{name}さん、ようこそ！🌱 まずは今日の学習をタイマーで記録して、報告してみてくださいね。一緒に森を育てましょう！",
+    "{name}さん、はじめまして！このチームでは学習を報告し合って1本の木を育てています🌳 最初の記録、お待ちしていますね！",
+    "ようこそ{name}さん！🎉 学習を報告するとチームの木が育ちます。今日の分からさっそく記録してみましょう！",
+]
+
 
 def adjust_group_members(db: Session, group_id: int, goal: str):
     if not group_id:
@@ -394,6 +403,69 @@ def cleanup_floating_ais(db: Session):
     return deleted_count, affected_groups
 
 
+def cleanup_ai_only_groups(db: Session):
+    """✨ 人間が1人もいない「抜け殻グループ」を掃除する。
+
+    最後の人間が卒業/キックで抜けると、adjust_group_membersがAIを
+    3体に補充するため、AIだけのグループが残り続ける。夜間の人数点検は
+    人間がいるグループしか見ない（無駄なAI補充をしないための仕様）ので、
+    誰にも使われないGroup行とAIが永遠に溜まっていく。
+
+    方針: グループ内のAIは group_id=NULL にして浮かせるだけにし、
+    AIの物理削除は実績のある cleanup_floating_ais に任せる
+    （夜間バッチでこの関数の直後に呼ばれる）。Group行は、グループ宛の
+    メッセージ（過去の人間の投稿・システムメッセージ・AI応援）と
+    そのリアクションを消してから削除する。
+    順序: reactions → messages → AIを外す → groups。
+
+    安全性: 1グループ=1トランザクション。掃除の最中に新規登録が
+    このグループへ人間を割り当てた場合、Group削除がDBの外部キー制約で
+    失敗して全体がロールバックされるため、登録側を壊すことはない
+    （そのグループは翌晩、人間がいれば掃除対象外になる）。
+    戻り値: (削除したグループ数, 浮かせたAIの数)
+    """
+    deleted_groups = 0
+    detached_ais = 0
+    all_groups = db.query(Group).all()
+    for g in all_groups:
+        members = db.query(User).filter(User.group_id == g.id).all()
+        humans = [m for m in members if not m.is_ai]
+        if humans:
+            continue  # 人間がいるグループには絶対に触らない
+        try:
+            # 1) このグループ宛メッセージに付いたリアクションを消す
+            msg_ids = [
+                mid
+                for (mid,) in db.query(Message.id)
+                .filter(Message.group_id == g.id)
+                .all()
+            ]
+            if msg_ids:
+                db.query(Reaction).filter(
+                    Reaction.message_id.in_(msg_ids)
+                ).delete(synchronize_session=False)
+            # 2) グループ宛メッセージを消す
+            db.query(Message).filter(Message.group_id == g.id).delete(
+                synchronize_session=False
+            )
+            # 3) AIメンバーを浮かせる（物理削除はcleanup_floating_aisが担当）
+            ai_count = 0
+            for m in members:
+                if m.is_ai:
+                    m.group_id = None
+                    ai_count += 1
+            # 4) Group行を消す（誰かが参照していればここで失敗→全ロールバック）
+            db.delete(g)
+            db.commit()
+            deleted_groups += 1
+            detached_ais += ai_count
+        except Exception as e:
+            # 1グループの失敗で掃除全体を止めない（翌晩また試行される）
+            db.rollback()
+            print(f"cleanup_ai_only_groups failed (group {g.id}): {e}")
+    return deleted_groups, detached_ais
+
+
 def assign_group_logic(db: Session, user: User):
     try:
         potential_groups = db.query(Group).filter(Group.goal == user.goal).all()
@@ -415,6 +487,33 @@ def assign_group_logic(db: Session, user: User):
         user.group_id = target_group.id
         db.commit()
         adjust_group_members(db, target_group.id, target_group.goal)
+        # ✨ オンボーディング: 参加直後の掲示板に歓迎メッセージを置く。
+        # 歓迎の失敗で登録そのものを失敗させないよう、ここだけで握りつぶす。
+        try:
+            ais = (
+                db.query(User)
+                .filter(User.group_id == target_group.id, User.is_ai == True)
+                .all()
+            )
+            if ais:
+                ai = random.choice(ais)
+                welcome = Message(
+                    group_id=target_group.id,
+                    user_id=ai.id,
+                    content=random.choice(AI_WELCOMES).format(name=user.name),
+                )
+            else:
+                # AIがいない（人間3人の）チームではシステム告知として迎える
+                welcome = Message(
+                    group_id=target_group.id,
+                    user_id=user.id,
+                    content=f"【システム】{user.name}さんが森に加わりました🌱 みんなで歓迎しましょう！",
+                )
+            db.add(welcome)
+            db.commit()
+        except Exception as welcome_error:
+            db.rollback()
+            print(f"welcome message failed (user {user.id}): {welcome_error}")
     except Exception as e:
         db.rollback()
         print(f"assign_group_logic failed (user {user.id}): {e}")
@@ -493,6 +592,19 @@ async def daily_check_task():
                             except Exception as fix_error:
                                 print(f"group {g.id} の人数調整に失敗: {fix_error}")
                     db.commit()
+
+                    # ✨ 抜け殻グループの掃除: 人間が1人もいない（AIだけ/空の）
+                    # グループは、AIを浮かせてからGroup行ごと削除する。
+                    # 浮かせたAIは、直後のcleanup_floating_aisがその晩のうちに回収する。
+                    try:
+                        g_deleted, g_detached = cleanup_ai_only_groups(db)
+                        if g_deleted:
+                            print(
+                                f"🧹 抜け殻グループを{g_deleted}個削除し、"
+                                f"AI{g_detached}体を浮かせました"
+                            )
+                    except Exception as ghost_error:
+                        print(f"抜け殻グループ掃除に失敗: {ghost_error}")
 
                     # ✨ 浮いたAIの掃除: 上の人数調整で外れた分も含めて、
                     # group_id=NULLのAIを毎晩ここで物理削除する。
@@ -993,14 +1105,30 @@ async def submit_report(
             .filter(User.group_id == user.group_id, User.is_ai == True)
             .all()
         )
-        if ai_members and random.random() < 0.7:
+        # ✨ オンボーディング: 初回報告だけは反応を運任せにしない。
+        # 「報告したら誰かが反応してくれた」という最初の体験が継続の鍵なので、
+        # 必ず応援メッセージを返し、応援スタンプも付ける。
+        is_first_report = (
+            db.query(Report).filter(Report.user_id == user.id).count() == 1
+        )
+        if ai_members and (is_first_report or random.random() < 0.7):
             ai = random.choice(ai_members)
+            if is_first_report:
+                cheer = (
+                    f"{user.name}さん、最初の学習記録おめでとうございます！🎉 "
+                    f"その一歩がチームの木を育てます。一緒に頑張りましょうね🌱"
+                )
+            else:
+                cheer = f"{user.name}さん、{random.choice(AI_ENCOURAGEMENTS)}"
             ai_msg = Message(
                 group_id=user.group_id,
                 user_id=ai.id,
-                content=f"{user.name}さん、{random.choice(AI_ENCOURAGEMENTS)}",
+                content=cheer,
             )
             db.add(ai_msg)
+            if is_first_report:
+                # 👏はフロントの応援スタンプ定番セット（STICKERS）にある絵文字
+                db.add(Reaction(message_id=msg.id, user_id=ai.id, emoji="👏"))
             db.commit()
 
         await manager.broadcast_to_group(user.group_id, "update")

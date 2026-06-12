@@ -444,6 +444,77 @@
         #monodeOverlay .mn-seal { margin-top: 1.6rem; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #a6dca0, #6fb86a); display: grid; place-items: center; font-size: 26px; box-shadow: 0 8px 22px rgba(110,184,106,0.45); }
         #monodeOverlay .mn-next { margin-top: 2rem; padding: 12px 40px; border: none; border-radius: 24px; background: linear-gradient(135deg, #f0a8c4, #e58aae); color: #fff; font-family: 'Zen Maru Gothic', sans-serif; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.1em; cursor: pointer; box-shadow: 0 6px 18px rgba(229,138,174,0.4); }
 
+        /* ✨ タブバー: 画面下部の固定ナビ。タブページはJSで切り替える */
+        .tab-page {
+            display: none;
+        }
+
+        .tab-page.active {
+            display: block;
+        }
+
+        #tabBar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            background: rgba(255, 253, 248, 0.97);
+            border-top: 1px solid #EAE5D9;
+            z-index: 900;
+            padding-bottom: env(safe-area-inset-bottom);
+            box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.07);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 13px 0 11px 0;
+            background: none;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            margin: 0;
+            width: auto;
+            font-size: 13px;
+            font-weight: bold;
+            color: #8D6E63;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .tab-btn.active {
+            color: #2E7D32;
+        }
+
+        .tab-btn.active::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 28%;
+            right: 28%;
+            height: 3px;
+            background: #66BB6A;
+            border-radius: 0 0 3px 3px;
+        }
+
+        .tab-dot {
+            position: absolute;
+            top: 9px;
+            right: calc(50% - 26px);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #E53935;
+            display: none;
+        }
+
+        #dashboard {
+            padding-bottom: 95px;
+        }
     </style>
 </head>
 
@@ -662,13 +733,7 @@
                 </div>
                 <div style="text-align: right;">
                     <button onclick="refreshData()" id="refreshBtn"
-                        style="width:auto; font-size:11px; padding:4px 14px; margin:0 0 6px 0;">更新</button>
-                    <p onclick="logout()"
-                        style="font-size:12px; cursor:pointer; text-decoration:underline; color:#8D6E63; margin:0; margin-bottom: 5px;">
-                        ログアウト</p>
-                    <p onclick="openGoalModal()"
-                        style="font-size:12px; cursor:pointer; text-decoration:underline; color:#2E7D32; margin:0; font-weight:bold;">
-                        ⚙️ 目標・期日</p>
+                        style="width:auto; font-size:11px; padding:4px 14px; margin:0;">更新</button>
                 </div>
             </div>
 
@@ -689,6 +754,20 @@
                        border-radius:15px; background:linear-gradient(135deg,#fde4ee,#f8cdde);
                        color:#b85a82; font-weight:bold; font-size:14px; line-height:1.7;
                        box-shadow:0 4px 14px rgba(229,138,174,0.3);">
+            </div>
+
+            <!-- ✨ タブページ: 既存カードは読み込み時にsetupTabLayout()でここへ移動する -->
+            <div id="tabHome" class="tab-page active"></div>
+            <div id="tabForest" class="tab-page"></div>
+            <div id="tabPlaza" class="tab-page"></div>
+            <div id="tabSettings" class="tab-page">
+                <div class="card">
+                    <h3 style="margin-top:0;">⚙️ 設定</h3>
+                    <button onclick="openProfileModal()">プロフィール（名前・画像）</button>
+                    <button onclick="openGoalModal()">目標・期日の変更</button>
+                    <button onclick="logout()"
+                        style="background: #CAC1AC; box-shadow: none;">ログアウト</button>
+                </div>
             </div>
 
             <div id="groupArea" class="card" style="display: none; background: #E8F5E9; border: 1px solid #C8E6C9;">
@@ -817,6 +896,14 @@
                 <div id="chatArea" class="chat-area"></div>
                 <input type="text" id="chatInput" placeholder="メッセージ">
                 <button onclick="sendMessage()">送信</button>
+            </div>
+
+            <div id="tabBar">
+                <button class="tab-btn active" data-tab="tabHome" onclick="switchTab('tabHome')">ホーム</button>
+                <button class="tab-btn" data-tab="tabForest" onclick="switchTab('tabForest')">森</button>
+                <button class="tab-btn" data-tab="tabPlaza" onclick="switchTab('tabPlaza')">広場<span id="plazaDot"
+                        class="tab-dot"></span></button>
+                <button class="tab-btn" data-tab="tabSettings" onclick="switchTab('tabSettings')">設定</button>
             </div>
         </div>
     </div>
@@ -1621,6 +1708,57 @@
         }
 
         function setGoal(text) { setGoalFor('regGoal', 'tagsContainer', text); }
+
+        // ===== ✨ タブバーUI =====
+        // 既存カードをHTMLの位置から各タブへ「移動」する。DOM要素の移動なので
+        // 要素への参照やイベントはそのまま保たれ、既存コードは変更不要。
+        let currentTab = 'tabHome';
+        let latestMessageId = 0;   // 掲示板の最新投稿id
+        let lastSeenMessageId = 0; // 広場で最後に見た投稿id(新着ドット用)
+
+        function setupTabLayout() {
+            const move = (el, dstId) => { if (el) document.getElementById(dstId).appendChild(el); };
+            const cardOf = (innerId) => {
+                const e = document.getElementById(innerId);
+                return e ? e.closest('.card') : null;
+            };
+            // ホーム: 期日 → 本棚 → タイマー → 報告 → 履歴
+            move(document.getElementById('countdownBox'), 'tabHome');
+            move(cardOf('myBookshelfList'), 'tabHome');
+            move(cardOf('display'), 'tabHome');
+            move(cardOf('reportContent'), 'tabHome');
+            move(cardOf('historyList'), 'tabHome');
+            // 森: チームメイト+木(groupArea) → 称号(rankBox) → サマリー → グラフ → 芝生
+            move(document.getElementById('groupArea'), 'tabForest');
+            move(document.getElementById('rankBox'), 'tabForest');
+            move(cardOf('weeklyMinutes'), 'tabForest');
+            move(cardOf('studyChart'), 'tabForest');
+            move(cardOf('heatmap'), 'tabForest');
+            // 広場: 掲示板
+            move(cardOf('chatArea'), 'tabPlaza');
+        }
+
+        function switchTab(tabId) {
+            currentTab = tabId;
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('active', p.id === tabId));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+            if (tabId === 'tabForest') {
+                // 非表示タブの中で描画されたグラフはサイズ0で壊れるため、表示時に再計算
+                if (typeof studyChartInstance !== 'undefined' && studyChartInstance) {
+                    try { studyChartInstance.resize(); } catch (e) { }
+                }
+            }
+            if (tabId === 'tabPlaza') {
+                lastSeenMessageId = latestMessageId;
+                const dot = document.getElementById('plazaDot');
+                if (dot) dot.style.display = 'none';
+                // 掲示板を開いたら最新まで自動スクロール
+                const ca = document.getElementById('chatArea');
+                if (ca) ca.scrollTop = ca.scrollHeight;
+            }
+        }
+
+        setupTabLayout();
 
         // ✨ 表記ゆれ対策: 目標変更モーダルにも登録画面と同じタグ一覧を出す。
         // 一覧の実体は登録画面の1箇所だけにし、モーダルを開くたびに複製する
@@ -2611,7 +2749,8 @@
                     const msgRes = await apiFetch(`/groups/${currentGroupId}/messages`);
                     const chatArea = document.getElementById('chatArea');
                     const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 1;
-                    chatArea.innerHTML = (await msgRes.json()).map(m => {
+                    const msgs = await msgRes.json();
+                    chatArea.innerHTML = msgs.map(m => {
                         // cls の判定は元の名前（エスケープ前）で行い、表示時にエスケープする。
                         const rawName = m.user_name || "";
                         let cls = rawName.includes('システム') || rawName.includes('AI') ? 'msg-ai' : 'msg-user';
@@ -2623,6 +2762,14 @@
                         return `<div class="msg ${cls}"><b>${iconHtml}${escapeHtml(rawName)}</b><br>${escapeHtml(m.content)}${reactionHtml}</div>`;
                     }).join('');
                     if (isScrolledToBottom) chatArea.scrollTop = chatArea.scrollHeight;
+                    // ✨ 広場タブの新着ドット: 別タブにいる間に新しい投稿が来たら知らせる
+                    latestMessageId = msgs.length ? Math.max(...msgs.map(m => m.id || 0)) : 0;
+                    if (currentTab === 'tabPlaza' || lastSeenMessageId === 0) {
+                        lastSeenMessageId = latestMessageId; // 閲覧中・初回読み込みは既読扱い
+                    } else if (latestMessageId > lastSeenMessageId) {
+                        const dot = document.getElementById('plazaDot');
+                        if (dot) dot.style.display = 'block';
+                    }
                 } catch (e) {
                     console.error('掲示板の取得に失敗しました:', e);
                 }

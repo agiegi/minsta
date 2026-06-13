@@ -468,14 +468,14 @@
 
         .tab-btn {
             flex: 1;
-            padding: 13px 0 11px 0;
+            padding: 17px 0 14px 0;
             background: none;
             border: none;
             border-radius: 0;
             box-shadow: none;
             margin: 0;
             width: auto;
-            font-size: 13px;
+            font-size: 15px;
             font-weight: bold;
             color: #8D6E63;
             position: relative;
@@ -513,7 +513,7 @@
         }
 
         #dashboard {
-            padding-bottom: 95px;
+            padding-bottom: 105px;
         }
     </style>
 </head>
@@ -713,6 +713,14 @@
                     style="font-size: 11px; color: #8D6E63; display: block; text-align: left; margin: 10px 0 2px 5px;">📅
                     目標の期日（任意）</label>
                 <input type="date" id="regDate" style="color: #5D4037;">
+
+                <div style="display:flex; align-items:flex-start; gap:8px; margin:14px 5px 4px; text-align:left;">
+                    <input type="checkbox" id="regAgree" style="width:auto; margin:3px 0 0 0; flex-shrink:0;">
+                    <label for="regAgree" style="font-size:12px; color:#5D4037; line-height:1.6; cursor:pointer;">
+                        <a href="/terms" target="_blank" style="color:#2E7D32;">利用規約</a>および<a href="/privacy"
+                            target="_blank" style="color:#2E7D32;">プライバシーポリシー</a>に同意します（未成年の場合は保護者の同意を得ています）
+                    </label>
+                </div>
 
                 <button onclick="register()"
                     style="background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%);">森の住人になる</button>
@@ -2017,6 +2025,10 @@
             const date = document.getElementById('regDate').value;
 
             if (!email || !password || !name || !goal) return alert("必須項目をすべて入力してください");
+
+            if (!document.getElementById('regAgree').checked) {
+                return alert("利用規約とプライバシーポリシーへの同意が必要です");
+            }
 
             try {
                 const res = await fetch(`${API_URL}/users/register`, {

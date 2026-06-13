@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 import urllib.request
@@ -51,6 +51,26 @@ GOOGLE_BOOKS_API_KEY = os.environ.get("GOOGLE_BOOKS_API_KEY", "")
 # これにより保存される値・既存データとの互換性は完全に維持される。
 def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+# ===== ✨ プッシュ通知(Web Push)の設定 =====
+# 鍵はRenderの環境変数で設定する(VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)。
+# pywebpush未導入・鍵未設定の場合は通知機能だけが静かに無効になり、
+# アプリ本体は通常どおり動く。
+try:
+    from pywebpush import webpush, WebPushException
+
+    PUSH_LIB_AVAILABLE = True
+except Exception:
+    PUSH_LIB_AVAILABLE = False
+
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:minsta@example.com")
+PUSH_ENABLED = (
+    PUSH_LIB_AVAILABLE and bool(VAPID_PUBLIC_KEY) and bool(VAPID_PRIVATE_KEY)
+)
+JST = timezone(timedelta(hours=9))
 
 
 # --- データベース設定 ---
@@ -144,6 +164,31 @@ class Reaction(Base):
     message_id = Column(Integer, ForeignKey("messages.id"), index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     emoji = Column(String)
+
+
+# ✨ 今日の種: 1日ごとの小さな宣言(チームへのTODO宣言)。
+# goal_dateはUTC日付の"YYYY-MM-DD"。芝生・連続記録・サボり点検と同じ
+# 日付規約(フロントのtoISOString基準)に統一している。
+class DailyGoal(Base):
+    __tablename__ = "daily_goals"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    content = Column(String)
+    goal_date = Column(String, index=True)
+    achieved = Column(Boolean, default=False)
+    declared = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=utcnow)
+
+
+# ✨ プッシュ通知の購読情報(1ユーザー複数端末を許容)
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    endpoint = Column(String, index=True)
+    p256dh = Column(String)
+    auth = Column(String)
+    created_at = Column(DateTime, default=utcnow)
 
 
 Base.metadata.create_all(bind=engine)
@@ -392,6 +437,10 @@ def cleanup_floating_ais(db: Session):
             db.query(Book).filter(Book.user_id == ai.id).delete(
                 synchronize_session=False
             )
+            # 今日の種も同様(AIは作らないが、あると削除が失敗し続けるため)
+            db.query(DailyGoal).filter(DailyGoal.user_id == ai.id).delete(
+                synchronize_session=False
+            )
             # 4) users（本体）
             db.delete(ai)
             db.commit()
@@ -467,6 +516,21 @@ def cleanup_ai_only_groups(db: Session):
     return deleted_groups, detached_ais
 
 
+def cleanup_old_daily_goals(db: Session, days: int = 30):
+    """✨ 古い「今日の種」を掃除する(既定30日より前)。
+    種は当日と翌日しか意味を持たないため、古いものは溜める価値がない。
+    戻り値: 削除した件数
+    """
+    cutoff = (utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    deleted = (
+        db.query(DailyGoal)
+        .filter(DailyGoal.goal_date < cutoff)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return deleted
+
+
 def assign_group_logic(db: Session, user: User):
     try:
         potential_groups = db.query(Group).filter(Group.goal == user.goal).all()
@@ -521,11 +585,95 @@ def assign_group_logic(db: Session, user: User):
         raise
 
 
+def send_study_reminders(db: Session):
+    """✨ 22時の学習リマインダー: 今日まだ報告していない購読者へ通知を送る。
+    「今日」の判定は既存規約(UTC日付=芝生・サボり点検と同じ)。
+    失効した購読(404/410)はその場で削除する。
+    戻り値: (送信成功数, 掃除した失効購読数)
+    """
+    if not PUSH_ENABLED:
+        return 0, 0
+    utc_now = utcnow()
+    today_start = datetime(utc_now.year, utc_now.month, utc_now.day)
+    reported_ids = {
+        row[0]
+        for row in db.query(Report.user_id)
+        .filter(Report.reported_at >= today_start)
+        .distinct()
+        .all()
+    }
+    subs = (
+        db.query(PushSubscription, User)
+        .join(User, PushSubscription.user_id == User.id)
+        .filter(User.is_ai == False)
+        .all()
+    )
+    payload = json.dumps(
+        {
+            "title": "今日はまだ学習していません！",
+            "body": "学習をして森を育てましょう",
+        }
+    )
+    sent = 0
+    removed = 0
+    for sub, target in subs:
+        if target.id in reported_ids:
+            continue
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+                },
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
+            )
+            sent += 1
+        except WebPushException as push_error:
+            status = getattr(
+                getattr(push_error, "response", None), "status_code", None
+            )
+            if status in (404, 410):
+                # 端末側で購読が失効している。データベースから掃除する。
+                db.delete(sub)
+                db.commit()
+                removed += 1
+            else:
+                print(f"push送信に失敗 (user {target.id}): {push_error}")
+        except Exception as push_error:
+            print(f"push送信に失敗 (user {target.id}): {push_error}")
+    return sent, removed
+
+
 # --- 毎晩23:59に作動するサボり点検バッチ ---
 async def daily_check_task():
     print("🌿 みんスタ サボり監視バッチが正常に起動しました")
+    last_reminder_date = None  # ✨ 22時リマインダーの送信済み日(重複送信ガード)
     while True:
         try:
+            # ✨ 22時(JST)の学習リマインダー。60秒間隔のループでも取りこぼさない
+            # よう「22時台でその日未送信なら送る」判定にしている(分==0判定は
+            # ループのずれで飛ばす恐れがある)。タイムゾーンは明示的にJST。
+            jst_now = datetime.now(JST)
+            if (
+                PUSH_ENABLED
+                and jst_now.hour == 22
+                and last_reminder_date != jst_now.date()
+            ):
+                last_reminder_date = jst_now.date()
+                reminder_db = SessionLocal()
+                try:
+                    sent, removed = send_study_reminders(reminder_db)
+                    print(
+                        f"🔔 学習リマインダーを{sent}件送信"
+                        f"(失効購読の掃除{removed}件)"
+                    )
+                except Exception as remind_error:
+                    print(f"リマインダー送信に失敗: {remind_error}")
+                finally:
+                    reminder_db.close()
+
             # トリガー判定は従来どおりサーバーのローカル時刻で行う（起動タイミングは不変）。
             now = datetime.now()
             if now.hour == 23 and now.minute == 59:
@@ -620,6 +768,15 @@ async def daily_check_task():
                                 )
                     except Exception as clean_error:
                         print(f"浮いたAI掃除に失敗: {clean_error}")
+
+                    # ✨ 古い「今日の種」の掃除(30日より前)
+                    try:
+                        old_seeds = cleanup_old_daily_goals(db)
+                        if old_seeds:
+                            print(f"🧹 古い種を{old_seeds}件掃除しました")
+                    except Exception as seed_error:
+                        db.rollback()
+                        print(f"古い種の掃除に失敗: {seed_error}")
                 finally:
                     db.close()
                 await asyncio.sleep(65)
@@ -731,12 +888,31 @@ def get_manifest():
     )
 
 
+SW_JS = """self.addEventListener('install', function (event) { self.skipWaiting(); });
+self.addEventListener('activate', function (event) { event.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', function (event) { });
+// ✨ プッシュ通知: 22時の学習リマインダー等を表示する
+self.addEventListener('push', function (event) {
+    var data = {};
+    try { data = event.data ? event.data.json() : {}; } catch (e) { }
+    var title = data.title || 'みんスタ';
+    event.waitUntil(self.registration.showNotification(title, {
+        body: data.body || '',
+        icon: '/icon-192.png?v=2',
+        badge: '/icon-192.png?v=2',
+        data: { url: '/' }
+    }));
+});
+self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+    event.waitUntil(clients.openWindow('/'));
+});
+"""
+
+
 @app.get("/sw.js")
 def get_sw():
-    return PlainTextResponse(
-        "self.addEventListener('fetch', function(event) {});",
-        media_type="application/javascript",
-    )
+    return PlainTextResponse(SW_JS, media_type="application/javascript")
 
 
 @app.websocket("/ws/{group_id}")
@@ -954,6 +1130,232 @@ async def update_name(
     if user.group_id:
         await manager.broadcast_to_group(user.group_id, "update")
     return {"message": "Name updated", "name": user.name}
+
+
+# ===== ✨ プッシュ通知(購読の登録/解除) =====
+@app.get("/push/public-key")
+def get_push_public_key():
+    # フロントが購読時に使う公開鍵。未設定なら機能オフを伝える。
+    return JSONResponse({"enabled": PUSH_ENABLED, "key": VAPID_PUBLIC_KEY})
+
+
+@app.post("/push/subscribe")
+def push_subscribe(
+    sub_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not PUSH_ENABLED:
+        raise HTTPException(status_code=503, detail="通知機能は現在準備中です")
+    endpoint = (sub_data.get("endpoint") or "").strip()
+    keys = sub_data.get("keys") or {}
+    p256dh = keys.get("p256dh")
+    auth = keys.get("auth")
+    if not endpoint or not p256dh or not auth:
+        raise HTTPException(status_code=400, detail="購読情報が不正です")
+    # 同じ端末(endpoint)の重複登録は上書き(端末でのユーザー切替にも対応)
+    existing = (
+        db.query(PushSubscription)
+        .filter(PushSubscription.endpoint == endpoint)
+        .first()
+    )
+    if existing:
+        existing.user_id = current_user.id
+        existing.p256dh = p256dh
+        existing.auth = auth
+    else:
+        db.add(
+            PushSubscription(
+                user_id=current_user.id,
+                endpoint=endpoint,
+                p256dh=p256dh,
+                auth=auth,
+            )
+        )
+    db.commit()
+    return {"message": "subscribed"}
+
+
+@app.post("/push/unsubscribe")
+def push_unsubscribe(
+    sub_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    endpoint = (sub_data.get("endpoint") or "").strip()
+    if endpoint:
+        db.query(PushSubscription).filter(
+            PushSubscription.endpoint == endpoint,
+            PushSubscription.user_id == current_user.id,
+        ).delete(synchronize_session=False)
+        db.commit()
+    return {"message": "unsubscribed"}
+
+
+# ===== ✨ 今日の種(1日ごとの小さな宣言) =====
+DAILY_GOAL_MAX_PER_DATE = 3
+
+
+def seed_dates():
+    """今日と明日のUTC日付文字列(芝生と同じ日付規約)"""
+    now = utcnow()
+    return now.strftime("%Y-%m-%d"), (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+@app.get("/daily-goals")
+async def get_daily_goals(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    today, tomorrow = seed_dates()
+    goals = (
+        db.query(DailyGoal)
+        .filter(
+            DailyGoal.user_id == current_user.id,
+            DailyGoal.goal_date.in_([today, tomorrow]),
+        )
+        .order_by(DailyGoal.id)
+        .all()
+    )
+    todays = [g for g in goals if g.goal_date == today]
+    # ✨ 朝の宣言(案A): その日最初にここへアクセスした時、未宣言の今日の種が
+    # あれば掲示板へ宣言を1通だけ流す。宣言は1日1回(後から追加した種は
+    # 騒音防止のため宣言に含めない=POST側でdeclared=True扱いにする)。
+    undeclared = [g for g in todays if not g.declared]
+    already_declared = any(g.declared for g in todays)
+    if undeclared and not already_declared and current_user.group_id:
+        try:
+            nums = ["①", "②", "③"]
+            lines = [
+                f"{nums[i] if i < 3 else '・'} {g.content}"
+                for i, g in enumerate(todays)
+            ]
+            db.add(
+                Message(
+                    group_id=current_user.group_id,
+                    user_id=current_user.id,
+                    content="【今日の種】\n" + "\n".join(lines),
+                )
+            )
+            for g in todays:
+                g.declared = True
+            db.commit()
+            await manager.broadcast_to_group(current_user.group_id, "update")
+        except Exception as e:
+            db.rollback()
+            print(f"seed declaration failed (user {current_user.id}): {e}")
+    return {
+        "today": [
+            {"id": g.id, "content": g.content, "achieved": g.achieved}
+            for g in todays
+        ],
+        "tomorrow": [
+            {"id": g.id, "content": g.content, "achieved": g.achieved}
+            for g in goals
+            if g.goal_date == tomorrow
+        ],
+    }
+
+
+@app.post("/daily-goals")
+def create_daily_goal(
+    goal_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    content = (goal_data.get("content") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="内容を入力してください")
+    if len(content) > 50:
+        raise HTTPException(status_code=400, detail="種は50文字以内で入力してください")
+    today, tomorrow = seed_dates()
+    goal_date = tomorrow if goal_data.get("date") == "tomorrow" else today
+    existing = (
+        db.query(DailyGoal)
+        .filter(
+            DailyGoal.user_id == current_user.id,
+            DailyGoal.goal_date == goal_date,
+        )
+        .all()
+    )
+    if len(existing) >= DAILY_GOAL_MAX_PER_DATE:
+        raise HTTPException(status_code=400, detail="種は1日3つまでです")
+    # その日の宣言が済んだ後に追加された種は、宣言済み扱い(再宣言しない)
+    already_declared = any(g.declared for g in existing)
+    g = DailyGoal(
+        user_id=current_user.id,
+        content=content,
+        goal_date=goal_date,
+        declared=(goal_date == today and already_declared),
+    )
+    db.add(g)
+    db.commit()
+    db.refresh(g)
+    return {"id": g.id, "content": g.content, "achieved": g.achieved}
+
+
+@app.patch("/daily-goals/{goal_id}/achieve")
+async def achieve_daily_goal(
+    goal_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = (
+        db.query(DailyGoal)
+        .filter(DailyGoal.id == goal_id, DailyGoal.user_id == current_user.id)
+        .first()
+    )
+    if not g:
+        raise HTTPException(status_code=404, detail="種が見つかりません")
+    if g.achieved:
+        return {"message": "already achieved"}
+    g.achieved = True
+    db.commit()
+    # ✨ 全達成のお祝い: 達成操作で「今日の種が全部達成」に変わった時だけ1通。
+    # 未達成は晒さない(達成だけを祝う非対称設計)。
+    today, _ = seed_dates()
+    if g.goal_date == today and current_user.group_id:
+        todays = (
+            db.query(DailyGoal)
+            .filter(
+                DailyGoal.user_id == current_user.id,
+                DailyGoal.goal_date == today,
+            )
+            .all()
+        )
+        if todays and all(t.achieved for t in todays):
+            try:
+                db.add(
+                    Message(
+                        group_id=current_user.group_id,
+                        user_id=current_user.id,
+                        content=f"【今日の種】{current_user.name}さんの種が今日もぜんぶ芽吹きました",
+                    )
+                )
+                db.commit()
+                await manager.broadcast_to_group(current_user.group_id, "update")
+            except Exception as e:
+                db.rollback()
+                print(f"seed celebration failed (user {current_user.id}): {e}")
+    return {"message": "achieved"}
+
+
+@app.delete("/daily-goals/{goal_id}")
+def delete_daily_goal(
+    goal_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = (
+        db.query(DailyGoal)
+        .filter(DailyGoal.id == goal_id, DailyGoal.user_id == current_user.id)
+        .first()
+    )
+    if not g:
+        raise HTTPException(status_code=404, detail="種が見つかりません")
+    db.delete(g)
+    db.commit()
+    return {"message": "deleted"}
 
 
 @app.get("/groups/{group_id}/members")

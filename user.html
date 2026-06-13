@@ -768,6 +768,15 @@
                     <button onclick="logout()"
                         style="background: #CAC1AC; box-shadow: none;">ログアウト</button>
                 </div>
+                <div class="card">
+                    <h3 style="margin-top:0; font-size:15px;">🔔 通知</h3>
+                    <p style="font-size:12px; color:#7A6F5D; margin:0;">
+                        その日まだ学習していないとき、22時にお知らせします。</p>
+                    <p id="pushStatus" style="font-size:11px; color:#8D6E63; margin:6px 0 0 0;"></p>
+                    <button id="pushEnableBtn" onclick="enablePush()">学習リマインダーを受け取る</button>
+                    <button id="pushDisableBtn" onclick="disablePush()"
+                        style="background: #CAC1AC; box-shadow: none; display: none;">通知を停止する</button>
+                </div>
             </div>
 
             <div id="groupArea" class="card" style="display: none; background: #E8F5E9; border: 1px solid #C8E6C9;">
@@ -811,6 +820,34 @@
                         style="width: 70px; margin-top: 8px; padding: 8px; background:#CAC1AC; color:#3E2723;">検索</button>
                 </div>
                 <div id="bookResults" class="book-search-container"></div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top: 0; font-size: 14px;">🌱 今日の種<span
+                        style="font-size: 10px; color: #8D6E63; font-weight: normal;">（今日やることの小さな宣言・3つまで）</span></h3>
+                <div id="seedTodayList"></div>
+                <div id="seedTodayAdd" style="display: flex; gap: 6px; margin-top: 6px;">
+                    <input type="text" id="seedTodayInput" maxlength="50" placeholder="今日やることを1つ"
+                        style="flex: 1; margin: 0;">
+                    <button onclick="addSeed('today')"
+                        style="width: auto; padding: 8px 16px; margin: 0; font-size: 12px;">まく</button>
+                </div>
+                <div style="margin-top: 10px; border-top: 1px dashed #EAE5D9; padding-top: 8px;">
+                    <div onclick="toggleTomorrowSeeds()"
+                        style="font-size: 12px; color: #8D6E63; cursor: pointer; font-weight: bold;">
+                        <span id="seedTomorrowArrow">▶</span> 明日の種をまいておく<span
+                            style="font-weight: normal; font-size: 10px;">（朝、自動で今日の種になります）</span>
+                    </div>
+                    <div id="seedTomorrowArea" style="display: none; margin-top: 6px;">
+                        <div id="seedTomorrowList"></div>
+                        <div id="seedTomorrowAdd" style="display: flex; gap: 6px; margin-top: 6px;">
+                            <input type="text" id="seedTomorrowInput" maxlength="50" placeholder="明日やることを1つ"
+                                style="flex: 1; margin: 0;">
+                            <button onclick="addSeed('tomorrow')"
+                                style="width: auto; padding: 8px 16px; margin: 0; font-size: 12px;">まく</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="card">
@@ -1725,6 +1762,7 @@
             // ホーム: 期日 → 本棚 → タイマー → 報告 → 履歴
             move(document.getElementById('countdownBox'), 'tabHome');
             move(cardOf('myBookshelfList'), 'tabHome');
+            move(cardOf('seedTodayList'), 'tabHome');  // 今日の種(タイマーの上)
             move(cardOf('display'), 'tabHome');
             move(cardOf('reportContent'), 'tabHome');
             move(cardOf('historyList'), 'tabHome');
@@ -1748,6 +1786,9 @@
                     try { studyChartInstance.resize(); } catch (e) { }
                 }
             }
+            if (tabId === 'tabSettings') {
+                updatePushUI(); // 通知の現在状態を表示
+            }
             if (tabId === 'tabPlaza') {
                 lastSeenMessageId = latestMessageId;
                 const dot = document.getElementById('plazaDot');
@@ -1759,6 +1800,190 @@
         }
 
         setupTabLayout();
+
+        // ===== ✨ 今日の種(1日ごとの小さな宣言) =====
+        // その日最初の読み込みでサーバーが掲示板へ宣言を流す(案A)。
+        // 達成は祝うが未達成は晒さない。サボり点検とは無関係。
+        let seedsCache = { today: [], tomorrow: [] };
+
+        async function loadSeeds() {
+            try {
+                const res = await apiFetch('/daily-goals');
+                if (!res.ok) return;
+                seedsCache = await res.json();
+                renderSeeds();
+            } catch (e) {
+                console.log('loadSeeds:', e);
+            }
+        }
+
+        function renderSeeds() {
+            const renderList = (list, listId, addId, kind) => {
+                const el = document.getElementById(listId);
+                if (!el) return;
+                if (!list.length) {
+                    el.innerHTML = kind === 'today'
+                        ? '<div style="font-size:11px; color:#B8B0A0; padding:4px 0;">まだ種がありません。今日やることを宣言してみましょう</div>'
+                        : '';
+                } else {
+                    el.innerHTML = list.map(s => `
+                        <div style="display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px dashed #F0EDE3;">
+                            <span onclick="${!s.achieved && kind === 'today' ? `achieveSeed(${s.id})` : ''}"
+                                style="cursor:${!s.achieved && kind === 'today' ? 'pointer' : 'default'}; font-size:16px;">${s.achieved ? '🌱' : '⬜'}</span>
+                            <span style="flex:1; font-size:13px; ${s.achieved ? 'text-decoration:line-through; color:#9CCC9C;' : 'color:#5D4037;'}">${escapeHtml(s.content)}</span>
+                            <span onclick="deleteSeed(${s.id})"
+                                style="cursor:pointer; color:#CAC1AC; font-size:14px; padding:0 4px;">✕</span>
+                        </div>`).join('');
+                }
+                const addEl = document.getElementById(addId);
+                if (addEl) addEl.style.display = list.length >= 3 ? 'none' : 'flex';
+            };
+            renderList(seedsCache.today || [], 'seedTodayList', 'seedTodayAdd', 'today');
+            renderList(seedsCache.tomorrow || [], 'seedTomorrowList', 'seedTomorrowAdd', 'tomorrow');
+        }
+
+        async function addSeed(when) {
+            const input = document.getElementById(when === 'today' ? 'seedTodayInput' : 'seedTomorrowInput');
+            const content = input.value.trim();
+            if (!content) return;
+            try {
+                const res = await apiFetch('/daily-goals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, date: when }),
+                });
+                if (res.ok) {
+                    input.value = '';
+                    await loadSeeds();
+                } else {
+                    const d = await res.json();
+                    alert(d.detail || '種をまけませんでした');
+                }
+            } catch (e) {
+                console.log('addSeed:', e);
+            }
+        }
+
+        async function achieveSeed(id) {
+            try {
+                const res = await apiFetch(`/daily-goals/${id}/achieve`, { method: 'PATCH' });
+                if (res.ok) await loadSeeds();
+            } catch (e) {
+                console.log('achieveSeed:', e);
+            }
+        }
+
+        async function deleteSeed(id) {
+            if (!confirm('この種を抜きますか？')) return;
+            try {
+                const res = await apiFetch(`/daily-goals/${id}`, { method: 'DELETE' });
+                if (res.ok) await loadSeeds();
+            } catch (e) {
+                console.log('deleteSeed:', e);
+            }
+        }
+
+        function toggleTomorrowSeeds() {
+            const a = document.getElementById('seedTomorrowArea');
+            const arrow = document.getElementById('seedTomorrowArrow');
+            const open = a.style.display === 'none';
+            a.style.display = open ? 'block' : 'none';
+            if (arrow) arrow.innerText = open ? '▼' : '▶';
+        }
+
+        // ===== ✨ プッシュ通知(22時の学習リマインダー) =====
+        // iPhoneはiOS16.4以降+「ホーム画面に追加」したPWAでのみ使える。
+        function pushSupported() {
+            return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+            return outputArray;
+        }
+
+        async function updatePushUI() {
+            const status = document.getElementById('pushStatus');
+            const onBtn = document.getElementById('pushEnableBtn');
+            const offBtn = document.getElementById('pushDisableBtn');
+            if (!status || !onBtn || !offBtn) return;
+            if (!pushSupported()) {
+                status.innerText = 'この環境では通知を使えません。iPhoneの場合は「ホーム画面に追加」したアプリから設定してください。';
+                onBtn.style.display = 'none';
+                offBtn.style.display = 'none';
+                return;
+            }
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                const on = !!sub && Notification.permission === 'granted';
+                status.innerText = on ? '通知はオンです（その日まだ学習していなければ22時にお知らせします）' : '';
+                onBtn.style.display = on ? 'none' : 'block';
+                offBtn.style.display = on ? 'block' : 'none';
+            } catch (e) {
+                console.log('updatePushUI:', e);
+            }
+        }
+
+        async function enablePush() {
+            if (!pushSupported()) {
+                alert('この環境では通知を使えません。iPhoneの場合は「ホーム画面に追加」したアプリから設定してください。');
+                return;
+            }
+            try {
+                const keyRes = await apiFetch('/push/public-key');
+                const keyData = await keyRes.json();
+                if (!keyData.enabled) {
+                    alert('通知機能はサーバー側の準備中です');
+                    return;
+                }
+                const perm = await Notification.requestPermission();
+                if (perm !== 'granted') {
+                    alert('通知が許可されませんでした。端末の設定から許可してください。');
+                    return;
+                }
+                const reg = await navigator.serviceWorker.ready;
+                let sub = await reg.pushManager.getSubscription();
+                if (!sub) {
+                    sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(keyData.key),
+                    });
+                }
+                const res = await apiFetch('/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sub.toJSON()),
+                });
+                if (res.ok) alert('リマインダー通知をオンにしました');
+                updatePushUI();
+            } catch (e) {
+                console.log('enablePush:', e);
+                alert('通知の設定に失敗しました');
+            }
+        }
+
+        async function disablePush() {
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                    await apiFetch('/push/unsubscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint: sub.endpoint }),
+                    });
+                    await sub.unsubscribe();
+                }
+                updatePushUI();
+            } catch (e) {
+                console.log('disablePush:', e);
+            }
+        }
 
         // ✨ 表記ゆれ対策: 目標変更モーダルにも登録画面と同じタグ一覧を出す。
         // 一覧の実体は登録画面の1箇所だけにし、モーダルを開くたびに複製する
@@ -2582,6 +2807,7 @@
         }
 
         async function fetchData() {
+            loadSeeds(); // ✨ 今日の種(待たない: 本体の読み込みを遅らせない)
             // --- 自分の情報を取得（これが取れないと何も表示できないので最初に） ---
             let me;
             try {

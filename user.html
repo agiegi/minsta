@@ -1827,6 +1827,73 @@
 
         setupTabLayout();
 
+        // ===== ✨ 横スワイプでのタブ移動 =====
+        // 画面を左右にスワイプすると隣のタブへ移動する。タップ(タブボタン)が主役で、
+        // スワイプは補助。switchTab()をそのまま呼ぶので、グラフ再描画や新着ドット消去
+        // などの既存処理は自動で効く。
+        (function setupSwipeNavigation() {
+            // タブの並び順。この配列上で「ひとつ右/左」を計算する。
+            const TAB_ORDER = ['tabHome', 'tabForest', 'tabPlaza', 'tabSettings'];
+
+            // タッチ開始位置と判定用フラグ
+            let startX = 0;       // 指を置いたX座標
+            let startY = 0;       // 指を置いたY座標
+            let tracking = false; // このスワイプを「タブ移動候補」として追うか
+
+            // スワイプと認める最小の横移動量(px)。これ未満は誤タッチ扱い。
+            const THRESHOLD = 60;
+            // 画面端から何pxを「OSの戻る/進む用」として無視するか(iOSの端スワイプ対策)
+            const EDGE_IGNORE = 24;
+
+            // スワイプの開始を無視すべき要素か判定する。
+            // グラフ(canvas)や掲示板など、横方向の操作・スクロールを持つ要素の上から
+            // 始まったスワイプは、タブ移動に使うと誤爆するので追わない。
+            function shouldIgnore(target) {
+                return !!target.closest(
+                    '#chatArea, canvas, input, textarea, button, a, .modal'
+                );
+            }
+
+            const dash = document.getElementById('dashboard');
+            if (!dash) return;
+
+            // touchstart: 指が触れた瞬間。追跡するかどうかを決める。
+            dash.addEventListener('touchstart', function (e) {
+                if (e.touches.length !== 1) { tracking = false; return; } // 2本指(ピンチ等)は無視
+                const t = e.touches[0];
+                // 画面の左右端から始まったスワイプはOSのジェスチャーに譲る
+                if (t.clientX < EDGE_IGNORE || t.clientX > window.innerWidth - EDGE_IGNORE) {
+                    tracking = false; return;
+                }
+                if (shouldIgnore(e.target)) { tracking = false; return; }
+                startX = t.clientX;
+                startY = t.clientY;
+                tracking = true;
+            }, { passive: true });
+
+            // touchend: 指が離れた瞬間。移動量を見てタブを切り替えるか決める。
+            dash.addEventListener('touchend', function (e) {
+                if (!tracking) return;
+                tracking = false;
+                const t = e.changedTouches[0];
+                const dx = t.clientX - startX; // 横移動量(右へ動かすと正)
+                const dy = t.clientY - startY; // 縦移動量
+
+                // 横移動が閾値を超え、かつ「縦より横の方が明確に大きい」ときだけタブ移動。
+                // これで縦スクロールを横スワイプと誤認しない。
+                if (Math.abs(dx) < THRESHOLD) return;
+                if (Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+                const idx = TAB_ORDER.indexOf(currentTab);
+                if (idx === -1) return;
+                // 指を左へ動かす(dx<0)=次のタブへ、右へ動かす(dx>0)=前のタブへ
+                const nextIdx = dx < 0 ? idx + 1 : idx - 1;
+                // 端を越えたら何もしない(ループしない)
+                if (nextIdx < 0 || nextIdx >= TAB_ORDER.length) return;
+                switchTab(TAB_ORDER[nextIdx]);
+            }, { passive: true });
+        })();
+
         // ===== ✨ 今日の種(1日ごとの小さな宣言) =====
         // その日最初の読み込みでサーバーが掲示板へ宣言を流す(案A)。
         // 達成は祝うが未達成は晒さない。サボり点検とは無関係。

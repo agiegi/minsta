@@ -521,7 +521,7 @@ def cleanup_old_daily_goals(db: Session, days: int = 30):
     種は当日と翌日しか意味を持たないため、古いものは溜める価値がない。
     戻り値: 削除した件数
     """
-    cutoff = (utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(JST) - timedelta(days=days)).strftime("%Y-%m-%d")
     deleted = (
         db.query(DailyGoal)
         .filter(DailyGoal.goal_date < cutoff)
@@ -593,8 +593,7 @@ def send_study_reminders(db: Session):
     """
     if not PUSH_ENABLED:
         return 0, 0
-    utc_now = utcnow()
-    today_start = datetime(utc_now.year, utc_now.month, utc_now.day)
+    today_start = jst_today_start_utc()
     reported_ids = {
         row[0]
         for row in db.query(Report.user_id)
@@ -680,11 +679,9 @@ async def daily_check_task():
                 db = SessionLocal()
                 try:
                     # 改良（バグ修正）: Report.reported_at は UTC で保存されている。
-                    # 従来はローカル時刻で「今日の0時」を作っていたため、サーバーのタイム
-                    # ゾーン次第で当日報告の判定がずれていた。UTC基準に統一し、
-                    # フロントエンド側の当日判定（toISOString = UTC基準）とも一致させる。
-                    utc_now = utcnow()
-                    today_start = datetime(utc_now.year, utc_now.month, utc_now.day)
+                    # 当日報告の判定は日本時間(JST)の今日0時を基準にする。
+                    # 芝生・連続記録・種・通知とすべて同じJST基準で揃えている。
+                    today_start = jst_today_start_utc()
 
                     users = (
                         db.query(User)
@@ -1230,10 +1227,23 @@ def push_unsubscribe(
 DAILY_GOAL_MAX_PER_DATE = 3
 
 
+def jst_today_start_utc():
+    """「日本時間での今日の0時」に対応するUTC時刻を返す。
+    reported_at等はDB上UTCで保存されているため、「JSTの今日に報告したか」を
+    判定するには、JST 0時をUTCに直した時刻(=前日15時UTC)以降かで比較する。
+    これで芝生・連続記録・サボり点検・通知の当日判定がすべてJST基準で一致する。"""
+    now_jst = datetime.now(JST)
+    jst_midnight = datetime(now_jst.year, now_jst.month, now_jst.day, tzinfo=JST)
+    return jst_midnight.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def seed_dates():
-    """今日と明日のUTC日付文字列(芝生と同じ日付規約)"""
-    now = utcnow()
-    return now.strftime("%Y-%m-%d"), (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    """今日と明日の日付文字列（日本時間=JST基準）。
+    種は「今日やることの宣言」という生活時間に密着した機能なので、
+    UTCではなくユーザーの体感に合うJSTで判定する。
+    （UTC基準だと、日本の朝9時を過ぎるまで翌日に繰り上がらないため）"""
+    now_jst = datetime.now(JST)
+    return now_jst.strftime("%Y-%m-%d"), (now_jst + timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 @app.get("/daily-goals")

@@ -1227,18 +1227,36 @@
             }
         }
 
+        // ✨ 日付の基準をすべて日本時間(JST)に統一するための共通関数。
+        // reported_at等はDB上UTCで保存されているため、日付の境界(その日の0時)を
+        // 日本時間で判定するには +9時間してから日付を取り出す必要がある。
+        // 例: UTC 2026-06-14T16:30(=JST 6/15 01:30)は「6/15」として扱う。
+        function toJstDateStr(utcLike) {
+            // utcLike: ISO文字列(末尾Zの有無を問わず内部的にUTC) または Date
+            const dt = (utcLike instanceof Date) ? utcLike : new Date(utcLike + (/[zZ]|[+-]\d\d:?\d\d$/.test(utcLike) ? '' : 'Z'));
+            const jst = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+            return jst.toISOString().split('T')[0];
+        }
+
+        // 「日本時間での今日」のYYYY-MM-DD。
+        function jstTodayStr() {
+            return toJstDateStr(new Date());
+        }
+
         // 連続学習日数（ストリーク）の計算。今日まだ未記録でも、昨日までの連続は「継続中」とみなす。
         function calcStreak(reports) {
             if (!reports || reports.length === 0) return 0;
-            const days = new Set(reports.map(r => r.reported_at.split('T')[0]));
+            const days = new Set(reports.map(r => toJstDateStr(r.reported_at)));
             let streak = 0;
-            const d = new Date();
-            if (!days.has(d.toISOString().split('T')[0])) {
-                d.setDate(d.getDate() - 1);
+            // JSTの今日を起点にする（UTCのtoISOStringだと日本の朝9時まで前日扱いになるため）
+            let cursor = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+            const cursorStr = () => cursor.toISOString().split('T')[0];
+            if (!days.has(cursorStr())) {
+                cursor.setUTCDate(cursor.getUTCDate() - 1);
             }
-            while (days.has(d.toISOString().split('T')[0])) {
+            while (days.has(cursorStr())) {
                 streak++;
-                d.setDate(d.getDate() - 1);
+                cursor.setUTCDate(cursor.getUTCDate() - 1);
             }
             return streak;
         }
@@ -2847,11 +2865,11 @@
             // --- 学習記録（本棚・グラフ・芝生・サマリー・ストリーク・履歴） ---
             // 改良: ここの通信が失敗しても、称号やチーム情報の表示は止めない。
             try {
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = jstTodayStr();
                 const repRes = await apiFetch(`/users/${currentUserId}/reports`);
                 const reports = await repRes.json();
 
-                const hasTodayReport = reports.some(r => r.reported_at.startsWith(todayStr));
+                const hasTodayReport = reports.some(r => toJstDateStr(r.reported_at) === todayStr);
                 const warningBanner = document.getElementById('warningBanner');
 
                 if (!hasTodayReport && currentGroupId) {
@@ -3018,18 +3036,19 @@
 
         function drawCustomHeatmap(reports) {
             const container = document.getElementById('heatmap'); container.innerHTML = "";
-            const now = new Date();
             const dailyData = {};
 
             reports.forEach(r => {
-                const d = r.reported_at.split('T')[0];
+                const d = toJstDateStr(r.reported_at);
                 if (!dailyData[d]) dailyData[d] = { totalMins: 0, books: {} };
                 dailyData[d].totalMins += r.study_minutes;
                 if (r.book_id) { dailyData[d].books[r.book_id] = (dailyData[d].books[r.book_id] || 0) + r.study_minutes; }
             });
 
+            // JSTの今日を起点に、過去28日のマスを並べる
+            const jstNow = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
             for (let i = 27; i >= 0; i--) {
-                const targetDate = new Date(); targetDate.setDate(now.getDate() - i);
+                const targetDate = new Date(jstNow.getTime()); targetDate.setUTCDate(jstNow.getUTCDate() - i);
                 const dateStr = targetDate.toISOString().split('T')[0];
                 const dayInfo = dailyData[dateStr];
                 const cell = document.createElement('div');

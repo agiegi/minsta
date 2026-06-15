@@ -515,6 +515,17 @@
         #dashboard {
             padding-bottom: 105px;
         }
+        .onboard-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #D7CFC0;
+            display: inline-block;
+        }
+
+        .onboard-dot.active {
+            background: #66BB6A;
+        }
     </style>
 </head>
 
@@ -966,6 +977,41 @@
         </div>
     </div>
 
+    <div id="onboardModal" class="modal" style="display:none; z-index:2000;">
+        <div class="modal-content" style="max-width:340px; text-align:center; padding:28px 24px;">
+            <div id="onboardStep1" class="onboard-step">
+                <div style="font-size:54px; line-height:1;">🌱</div>
+                <h2 style="font-size:20px; margin:14px 0 6px; color:#2E7D32;">みんスタへようこそ！</h2>
+                <p style="font-size:14px; color:#5D4037; line-height:1.7; margin:0;">
+                    みんスタは、同じ目標の仲間と少人数チームで、毎日の学習を記録しながら森を育てるアプリです。まずは使い方を30秒だけ見てみましょう。</p>
+            </div>
+            <div id="onboardStep2" class="onboard-step" style="display:none;">
+                <div style="font-size:46px; line-height:1;">📚 ⏱️ 🌳</div>
+                <h2 style="font-size:18px; margin:14px 0 10px; color:#2E7D32;">3ステップだけ</h2>
+                <div style="text-align:left; font-size:14px; color:#5D4037; line-height:2;">
+                    <div><b>① 本を選ぶ</b>…使っている参考書を本棚に登録</div>
+                    <div><b>② タイマーで勉強</b>…集中して学習</div>
+                    <div><b>③ 記録する</b>…報告すると、チームの森が育ちます</div>
+                </div>
+            </div>
+            <div id="onboardStep3" class="onboard-step" style="display:none;">
+                <div style="font-size:54px; line-height:1;">✍️</div>
+                <h2 style="font-size:20px; margin:14px 0 6px; color:#2E7D32;">さっそく、最初の1歩を</h2>
+                <p style="font-size:14px; color:#5D4037; line-height:1.7; margin:0;">
+                    今日やった学習を、1つ記録してみましょう。小さな1回が、あなたの森の最初の芽になります。</p>
+            </div>
+
+            <div style="display:flex; gap:6px; justify-content:center; margin:20px 0 16px;">
+                <span class="onboard-dot active"></span>
+                <span class="onboard-dot"></span>
+                <span class="onboard-dot"></span>
+            </div>
+
+            <button id="onboardNext" onclick="onboardNext()" style="width:100%; margin:0;">つぎへ</button>
+            <p onclick="closeOnboard()" style="font-size:12px; color:#8D6E63; cursor:pointer; margin:12px 0 0;">スキップ</p>
+        </div>
+    </div>
+
     <div id="memberDetailModal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <div id="memberDetailIcon" style="display:flex; justify-content:center; align-items:center; height:80px; margin-bottom:10px;"></div>
@@ -1088,6 +1134,7 @@
 
     <script>
         const API_URL = '';
+        let justRegistered = false; // ✨ 登録直後の初回ガイド表示用
         let currentUserId = null, currentUserName = "", currentGroupId = null, currentTargetDate = null, currentGoal = "";
         // 称号バッジ画像（base64埋め込み。開発者=大樹/アドバイザー=雫/テスター=双葉/達成=桜）
         const BADGE_IMAGES = {
@@ -1894,7 +1941,57 @@
             }, { passive: true });
         })();
 
-        // ===== ✨ 今日の種(1日ごとの小さな宣言) =====
+        // ===== ✨ 初回オンボーディング =====
+        // 登録直後に1回だけ、3ステップの簡単な使い方を見せて最初の報告へ誘導する。
+        // 「義理で登録した人」ではなく「これから興味で来る新規ユーザー」が、
+        // 何をするアプリかを掴んで最初の1歩を踏めるようにするのが狙い。
+        let onboardStep = 1;
+
+        function maybeShowOnboarding() {
+            if (!justRegistered) return; // 登録直後の初回だけ
+            justRegistered = false;
+            onboardStep = 1;
+            renderOnboardStep();
+            const m = document.getElementById('onboardModal');
+            if (m) m.style.display = 'flex';
+        }
+
+        function renderOnboardStep() {
+            for (let i = 1; i <= 3; i++) {
+                const el = document.getElementById('onboardStep' + i);
+                if (el) el.style.display = (i === onboardStep) ? 'block' : 'none';
+            }
+            const dots = document.querySelectorAll('.onboard-dot');
+            dots.forEach((d, i) => d.classList.toggle('active', i === onboardStep - 1));
+            const btn = document.getElementById('onboardNext');
+            if (btn) btn.innerText = (onboardStep === 3) ? 'さっそく記録する' : 'つぎへ';
+        }
+
+        function onboardNext() {
+            if (onboardStep < 3) {
+                onboardStep++;
+                renderOnboardStep();
+                return;
+            }
+            // 最後のステップ: 閉じて報告フォームへ案内する
+            closeOnboard();
+            const reportCard = document.getElementById('reportContent');
+            if (reportCard) {
+                const card = reportCard.closest('.card');
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // 一瞬だけ枠を光らせて「ここだよ」と示す
+                    card.style.transition = 'box-shadow .3s';
+                    card.style.boxShadow = '0 0 0 3px #66BB6A';
+                    setTimeout(() => { card.style.boxShadow = ''; }, 1600);
+                }
+            }
+        }
+
+        function closeOnboard() {
+            const m = document.getElementById('onboardModal');
+            if (m) m.style.display = 'none';
+        }
         // その日最初の読み込みでサーバーが掲示板へ宣言を流す(案A)。
         // 達成は祝うが未達成は晒さない。サボり点検とは無関係。
         let seedsCache = { today: [], tomorrow: [] };
@@ -2125,6 +2222,7 @@
                 if (!res.ok) throw new Error("すでに登録されているメールアドレスか、エラーが発生しました。");
 
                 const data = await res.json();
+                justRegistered = true; // ✨ 初回オンボーディング表示のためのフラグ
                 alert(`🌱 登録完了！\n\nあなたのユーザーIDは【 ${data.user.id} 】です！\nようこそ、みんスタへ！`);
 
                 document.getElementById('loginEmail').value = email;
@@ -3099,6 +3197,8 @@
             } else {
                 document.getElementById('groupArea').style.display = 'none';
             }
+
+            maybeShowOnboarding(); // ✨ 登録直後なら初回ガイドを表示
         }
 
         function drawCustomHeatmap(reports) {

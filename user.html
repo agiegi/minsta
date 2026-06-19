@@ -453,6 +453,25 @@
             display: block;
         }
 
+        /* ✨ タブ切り替え時のスライドイン。方向に応じて左右から滑り込む。 */
+        .tab-page.slide-from-right {
+            animation: slideFromRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        .tab-page.slide-from-left {
+            animation: slideFromLeft 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        @keyframes slideFromRight {
+            from { transform: translateX(18%); opacity: 0.4; }
+            to   { transform: translateX(0);    opacity: 1; }
+        }
+
+        @keyframes slideFromLeft {
+            from { transform: translateX(-18%); opacity: 0.4; }
+            to   { transform: translateX(0);    opacity: 1; }
+        }
+
         #tabBar {
             position: fixed;
             bottom: 0;
@@ -1883,9 +1902,34 @@
             move(cardOf('chatArea'), 'tabPlaza');
         }
 
-        function switchTab(tabId) {
+        // タブの並び順（スライド方向の計算に使う）
+        const TAB_SEQUENCE = ['tabHome', 'tabForest', 'tabPlaza', 'tabSettings'];
+
+        function switchTab(tabId, direction) {
+            // direction: 'right'(次のタブへ=右から入る) / 'left'(前のタブへ=左から入る) / 未指定(自動計算)
+            const prevTab = currentTab;
             currentTab = tabId;
-            document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('active', p.id === tabId));
+
+            // 方向が指定されていなければ、タブの並び順から自動で決める
+            if (!direction && prevTab && prevTab !== tabId) {
+                const from = TAB_SEQUENCE.indexOf(prevTab);
+                const to = TAB_SEQUENCE.indexOf(tabId);
+                if (from !== -1 && to !== -1) {
+                    direction = (to > from) ? 'right' : 'left';
+                }
+            }
+
+            document.querySelectorAll('.tab-page').forEach(p => {
+                const isActive = (p.id === tabId);
+                p.classList.toggle('active', isActive);
+                // 一旦スライド用クラスを外し、表示するページにだけ方向に応じて付け直す
+                p.classList.remove('slide-from-right', 'slide-from-left');
+                if (isActive && direction) {
+                    // リフローを挟んでアニメーションを確実に再生させる
+                    void p.offsetWidth;
+                    p.classList.add(direction === 'right' ? 'slide-from-right' : 'slide-from-left');
+                }
+            });
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
             if (tabId === 'tabForest') {
                 // 非表示タブの中で描画されたグラフはサイズ0で壊れるため、表示時に再計算
@@ -1971,7 +2015,8 @@
                 const nextIdx = dx < 0 ? idx + 1 : idx - 1;
                 // 端を越えたら何もしない(ループしない)
                 if (nextIdx < 0 || nextIdx >= TAB_ORDER.length) return;
-                switchTab(TAB_ORDER[nextIdx]);
+                // 指を左へ動かした(dx<0)=次のタブ=右から入る、右へ=前のタブ=左から入る
+                switchTab(TAB_ORDER[nextIdx], dx < 0 ? 'right' : 'left');
             }, { passive: true });
         })();
 

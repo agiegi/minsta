@@ -526,10 +526,44 @@
         .onboard-dot.active {
             background: #66BB6A;
         }
+        /* ✨ 報告成功トースト（ポンッと弾んで出て、すっと消える） */
+        #reportToast {
+            position: fixed;
+            top: 38%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.6);
+            background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 16px 30px;
+            border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+            z-index: 3000;
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        #reportToast.show {
+            animation: reportPop 1.6s ease forwards;
+        }
+
+        @keyframes reportPop {
+            /* 小さく出る → ぷるんと弾けて少し大きく → 落ち着く → すっと消える */
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+            18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+            32%  { transform: translate(-50%, -50%) scale(0.97); }
+            45%  { transform: translate(-50%, -50%) scale(1.02); }
+            58%  { transform: translate(-50%, -50%) scale(1); }
+            80%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -52%) scale(1); }
+        }
     </style>
 </head>
 
 <body>
+    <div id="reportToast">🌱 報告しました！</div>
 
     <div class="app-container">
         <h1>🌱 みんスタ</h1>
@@ -2863,15 +2897,36 @@
             const bookId = document.getElementById('activeBookSelect').value;
 
             if (!content || mins <= 0) return alert("内容と分数（1分以上）を入力してください");
-            await apiFetch(`/reports/submit`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: currentUserId, content: content, study_minutes: parseInt(mins), book_id: bookId ? parseInt(bookId) : null })
-            });
+            try {
+                await apiFetch(`/reports/submit`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUserId, content: content, study_minutes: parseInt(mins), book_id: bookId ? parseInt(bookId) : null })
+                });
+            } catch (e) {
+                alert("報告の送信に失敗しました。通信状況を確認してもう一度お試しください。");
+                return;
+            }
             document.getElementById('reportContent').value = ""; document.getElementById('studyMinutes').value = "0";
             if (timerObj) clearInterval(timerObj);
             currentSecondsDisplay = 0; updateDisplay();
             resetTimerButtons();
+            showReportToast(); // ✨ 報告できた手応えを出す
             fetchData();
+        }
+
+        // ✨ 報告成功の合図。「報告しました！」がポンッと弾んで出て、すっと消える。
+        // 一番大事な"行動が効いた瞬間"に手応えを与えるためのマイクロインタラクション。
+        function showReportToast() {
+            const toast = document.getElementById('reportToast');
+            if (!toast) return;
+            // アニメーションを毎回やり直すため、一度クラスを外してから付け直す
+            toast.classList.remove('show');
+            void toast.offsetWidth; // リフロー強制（これでアニメがリセットされる）
+            toast.classList.add('show');
+            // 対応端末(主にAndroid)では軽い振動も添える。iPhoneは非対応だが無害。
+            if (navigator.vibrate) {
+                try { navigator.vibrate(40); } catch (e) { }
+            }
         }
 
         async function sendMessage() {

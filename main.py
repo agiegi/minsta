@@ -36,8 +36,7 @@ import base64
 import json
 import os
 
-# .env ファイルから環境変数を読み込む。
-# APIキーなどの秘密情報はコードに直接書かず、ここから取得する。
+# .env ファイルから環境変数を読み込む。APIキーの取得
 load_dotenv()
 
 # Google Books API キー。.env に「GOOGLE_BOOKS_API_KEY=...」の形式で設定する。
@@ -53,7 +52,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-# ===== ✨ プッシュ通知(Web Push)の設定 =====
+# =====プッシュ通知(Web Push)の設定 =====
 # 鍵はRenderの環境変数で設定する(VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)。
 # pywebpush未導入・鍵未設定の場合は通知機能だけが静かに無効になり、
 # アプリ本体は通常どおり動く。
@@ -119,13 +118,13 @@ class User(Base):
     is_ai = Column(Boolean, default=False)
     strike_count = Column(Integer, default=0)
     profile_image = Column(String, nullable=True)
-    # ✨ 門出（卒業）を一度でも経験したか。桜バッジの表示に使う。
+    #門出（卒業）を一度でも経験したか。桜バッジの表示に使う。
     has_graduated = Column(Boolean, default=False)
-    # ✨ 称号バッジ（運営が手動で付与）。開発者=大樹 / アドバイザー=雫 / テスター=双葉
+    #称号バッジ（運営が手動で付与）。開発者=大樹 / アドバイザー=雫 / テスター=双葉
     is_developer = Column(Boolean, default=False)
     is_advisor = Column(Boolean, default=False)
     is_tester = Column(Boolean, default=False)
-    # ✨ 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
+    #認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
     auth_token = Column(String, nullable=True, index=True)
 
 
@@ -157,7 +156,7 @@ class Message(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
-# ✨ 新機能: 掲示板メッセージへの応援リアクション（スタンプ）
+#新機能: 掲示板メッセージへの応援リアクション（スタンプ）
 class Reaction(Base):
     __tablename__ = "reactions"
     id = Column(Integer, primary_key=True, index=True)
@@ -166,7 +165,7 @@ class Reaction(Base):
     emoji = Column(String)
 
 
-# ✨ 今日の種: 1日ごとの小さな宣言(チームへのTODO宣言)。
+# 今日の種: 1日ごとの小さな宣言(チームへのTODO宣言)。
 # goal_dateはUTC日付の"YYYY-MM-DD"。芝生・連続記録・サボり点検と同じ
 # 日付規約(フロントのtoISOString基準)に統一している。
 class DailyGoal(Base):
@@ -180,7 +179,7 @@ class DailyGoal(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
-# ✨ プッシュ通知の購読情報(1ユーザー複数端末を許容)
+#プッシュ通知の購読情報(1ユーザー複数端末を許容)
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
     id = Column(Integer, primary_key=True, index=True)
@@ -322,7 +321,7 @@ def get_custom_id(db: Session, is_ai: bool):
 # --- AIマッチングロジック ---
 AI_NAMES = ["[AI] サクラ", "[AI] ハルト", "[AI] ミナト", "[AI] ユイ", "[AI] メンター"]
 
-# ✨ 新機能: AIメンバーが学習報告に反応するときの応援メッセージ
+# 新機能: AIメンバーが学習報告に反応するときの応援メッセージ
 AI_ENCOURAGEMENTS = [
     "ナイス学習です！その積み重ねが実を結びますよ✨",
     "今日もよく頑張りましたね🍵 しっかり休んでください",
@@ -332,7 +331,7 @@ AI_ENCOURAGEMENTS = [
     "継続は力なり、ですね。応援しています📣",
 ]
 
-# ✨ オンボーディング: チーム参加時にAIが投稿する歓迎メッセージ。
+# 新機能: オンボーディング: チーム参加時にAIが投稿する歓迎メッセージ。
 # 登録直後の掲示板が無言だと何をすべきか分からないため、名前入りで迎えて
 # 最初の行動（タイマーで学習→報告）を案内する。
 AI_WELCOMES = [
@@ -739,7 +738,7 @@ async def daily_check_task():
                                 print(f"group {g.id} の人数調整に失敗: {fix_error}")
                     db.commit()
 
-                    # ✨ 抜け殻グループの掃除: 人間が1人もいない（AIだけ/空の）
+                    #抜け殻グループの掃除: 人間が1人もいない（AIだけ/空の）
                     # グループは、AIを浮かせてからGroup行ごと削除する。
                     # 浮かせたAIは、直後のcleanup_floating_aisがその晩のうちに回収する。
                     try:
@@ -752,7 +751,7 @@ async def daily_check_task():
                     except Exception as ghost_error:
                         print(f"抜け殻グループ掃除に失敗: {ghost_error}")
 
-                    # ✨ 浮いたAIの掃除: 上の人数調整で外れた分も含めて、
+                    #浮いたAIの掃除: 上の人数調整で外れた分も含めて、
                     # group_id=NULLのAIを毎晩ここで物理削除する。
                     # 失敗してもバッチ全体は止めない（翌晩リトライされる）。
                     try:
@@ -766,7 +765,7 @@ async def daily_check_task():
                     except Exception as clean_error:
                         print(f"浮いたAI掃除に失敗: {clean_error}")
 
-                    # ✨ 古い「今日の種」の掃除(30日より前)
+                    # 古い「今日の種」の掃除(30日より前)
                     try:
                         old_seeds = cleanup_old_daily_goals(db)
                         if old_seeds:
@@ -826,7 +825,7 @@ def serve_html():
     return FileResponse("user.html")
 
 
-# ✨ PWAアイコン: AndroidのChromeはホーム画面インストールの要件として
+# PWAアイコン: AndroidのChromeはホーム画面インストールの要件として
 # 「実URLで配信されるPNGアイコン(192pxと512px)」を要求する。
 # 従来のdata URI SVG絵文字アイコンはこの要件を満たさず、Androidで
 # ホーム画面に追加できない原因だった。森の大樹から生成したPNGを
@@ -1003,7 +1002,7 @@ def register(user_data: dict, db: Session = Depends(get_db)):
                 db.rollback()
                 print(f"register cleanup failed: {cleanup_error}")
         raise HTTPException(status_code=500, detail="Registration failed. Please retry.")
-    # ✨ 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
+    # 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
     return {
         "user": {"id": new_user.id, "name": new_user.name, "goal": new_user.goal},
         "token": new_user.auth_token,
@@ -1019,7 +1018,7 @@ def login_user(login_data: dict, db: Session = Depends(get_db)):
         login_data["password"].encode("utf-8"), user.hashed_password.encode("utf-8")
     ):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    # ✨ 認証: ログインのたびに新しいトークンを発行する。
+    # 認証: ログインのたびに新しいトークンを発行する。
     user.auth_token = issue_token()
     db.commit()
     return {
@@ -1028,7 +1027,7 @@ def login_user(login_data: dict, db: Session = Depends(get_db)):
     }
 
 
-# ✨ 認証: ログアウト。サーバー側のトークンを無効化する。
+# 認証: ログアウト。サーバー側のトークンを無効化する。
 @app.post("/users/logout")
 def logout_user(
     current_user: User = Depends(get_current_user),
@@ -1039,7 +1038,7 @@ def logout_user(
     return {"message": "Logged out"}
 
 
-# ✨ 認証: ログイン中ユーザー自身の情報を返す。
+# 認証: ログイン中ユーザー自身の情報を返す。
 # 旧 GET /users/（全ユーザーを返す）は、他人の情報まで露出するため廃止し、
 # 「自分の情報だけを返す」このエンドポイントに置き換えた。
 @app.get("/users/me")
@@ -1163,7 +1162,7 @@ async def update_name(
     return {"message": "Name updated", "name": user.name}
 
 
-# ===== ✨ プッシュ通知(購読の登録/解除) =====
+# =====プッシュ通知(購読の登録/解除) =====
 @app.get("/push/public-key")
 def get_push_public_key():
     # フロントが購読時に使う公開鍵。未設定なら機能オフを伝える。
@@ -1223,7 +1222,7 @@ def push_unsubscribe(
     return {"message": "unsubscribed"}
 
 
-# ===== ✨ 今日の種(1日ごとの小さな宣言) =====
+# ===== 今日の種(1日ごとの小さな宣言) =====
 DAILY_GOAL_MAX_PER_DATE = 3
 
 
@@ -1262,7 +1261,7 @@ async def get_daily_goals(
         .all()
     )
     todays = [g for g in goals if g.goal_date == today]
-    # ✨ 朝の宣言(案A): その日最初にここへアクセスした時、未宣言の今日の種が
+    # 朝の宣言(案A): その日最初にここへアクセスした時、未宣言の今日の種が
     # あれば掲示板へ宣言を1通だけ流す。宣言は1日1回(後から追加した種は
     # 騒音防止のため宣言に含めない=POST側でdeclared=True扱いにする)。
     undeclared = [g for g in todays if not g.declared]
@@ -1355,7 +1354,7 @@ async def achieve_daily_goal(
         return {"message": "already achieved"}
     g.achieved = True
     db.commit()
-    # ✨ 全達成のお祝い: 達成操作で「今日の種が全部達成」に変わった時だけ1通。
+    # 全達成のお祝い: 達成操作で「今日の種が全部達成」に変わった時だけ1通。
     # 未達成は晒さない(達成だけを祝う非対称設計)。
     today, _ = seed_dates()
     if g.goal_date == today and current_user.group_id:
@@ -1408,7 +1407,7 @@ def get_members(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分が所属するチームの情報のみ閲覧できる。
+    # 認証: 自分が所属するチームの情報のみ閲覧できる。
     if current_user.group_id != group_id:
         raise HTTPException(
             status_code=403, detail="このチームの情報は閲覧できません"
@@ -1505,7 +1504,7 @@ def add_book(
     return {"message": "Book added"}
 
 
-# ✨ 変更：表紙画像のアップデートも処理できるように改良
+# 変更：表紙画像のアップデートも処理できるように改良
 @app.post("/books/{book_id}/update")
 def update_book(
     book_id: int,
@@ -1516,7 +1515,7 @@ def update_book(
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         return {"message": "Book already deleted"}
-    # ✨ 認証: 自分の参考書だけを編集できる。
+    # 認証: 自分の参考書だけを編集できる。
     if book.user_id != current_user.id:
         raise HTTPException(
             status_code=403, detail="他のユーザーの参考書は操作できません"
@@ -1540,7 +1539,7 @@ async def delete_book(
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         return {"message": "Book already deleted"}
-    # ✨ 認証: 自分の参考書だけを削除できる。
+    # 認証: 自分の参考書だけを削除できる。
     if book.user_id != current_user.id:
         raise HTTPException(
             status_code=403, detail="他のユーザーの参考書は操作できません"
@@ -1561,7 +1560,7 @@ async def submit_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 学習記録は必ずログイン中ユーザー本人のものとして登録する。
+    # 認証: 学習記録は必ずログイン中ユーザー本人のものとして登録する。
     # リクエストボディの user_id は信用せず、トークンから特定した本人を使う。
     user = current_user
     r = Report(
@@ -1583,14 +1582,14 @@ async def submit_report(
         db.add(msg)
         db.commit()
 
-        # ✨ 新機能: グループにいるAIメンバーが、一定の確率で応援メッセージを投稿する。
+        # 新機能: グループにいるAIメンバーが、一定の確率で応援メッセージを投稿する。
         # 過疎なチームでも反応が返ってくることで「続けやすい」体験を作る。
         ai_members = (
             db.query(User)
             .filter(User.group_id == user.group_id, User.is_ai == True)
             .all()
         )
-        # ✨ オンボーディング: 初回報告だけは反応を運任せにしない。
+        # オンボーディング: 初回報告だけは反応を運任せにしない。
         # 「報告したら誰かが反応してくれた」という最初の体験が継続の鍵なので、
         # 必ず応援メッセージを返し、応援スタンプも付ける。
         is_first_report = (
@@ -1651,7 +1650,7 @@ async def delete_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分の学習記録だけを削除できる。
+    # 認証: 自分の学習記録だけを削除できる。
     # 従来は user_id をクエリで受け取っており詐称が可能だったため、
     # トークンから特定した本人の ID で絞り込む。
     report = (
@@ -1674,7 +1673,7 @@ def get_messages(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分が所属するチームの掲示板のみ閲覧できる。
+    # 認証: 自分が所属するチームの掲示板のみ閲覧できる。
     if current_user.group_id != group_id:
         raise HTTPException(
             status_code=403, detail="このチームの掲示板は閲覧できません"
@@ -1734,7 +1733,7 @@ async def post_message(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # ✨ 認証: 自分が所属するチームにのみ、本人として投稿できる。
+    # 認証: 自分が所属するチームにのみ、本人として投稿できる。
     if current_user.group_id != group_id:
         raise HTTPException(
             status_code=403, detail="このチームには投稿できません"
@@ -1748,7 +1747,7 @@ async def post_message(
     return {"message": "Message posted"}
 
 
-# ✨ 新機能: メッセージへの応援リアクション（スタンプ）をトグルする。
+# 新機能: メッセージへの応援リアクション（スタンプ）をトグルする。
 @app.post("/messages/{message_id}/reactions")
 async def toggle_reaction(
     message_id: int,
@@ -1759,7 +1758,7 @@ async def toggle_reaction(
     msg = db.query(Message).filter(Message.id == message_id).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
-    # ✨ 認証: 自分が所属するチームのメッセージにのみ反応できる。
+    # 認証: 自分が所属するチームのメッセージにのみ反応できる。
     if current_user.group_id != msg.group_id:
         raise HTTPException(
             status_code=403, detail="このメッセージには反応できません"
@@ -1791,7 +1790,7 @@ async def toggle_reaction(
     return {"message": "Reaction toggled"}
 
 
-# ✨ セキュリティ改良: 書籍検索のサーバー側プロキシ。
+# セキュリティ改良: 書籍検索のサーバー側プロキシ。
 # 従来は user.html に Google Books API キーを直書きしていたため、ブラウザから
 # キーが丸見えだった。検索をサーバーが代行することで、キーは .env（サーバー）に
 # のみ存在し、ブラウザには一切渡らなくなる。ログイン中ユーザーのみ利用できる。

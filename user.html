@@ -957,7 +957,7 @@
 
             <div class="card">
                 <h3>📝 学習報告</h3>
-                <textarea id="reportContent" rows="2" placeholder="内容を入力"></textarea>
+                <textarea id="reportContent" rows="2" placeholder="例：英文法を10ページ／過去問を2年分 など、やったことを一言で"></textarea>
                 <input type="number" id="studyMinutes" value="0">
                 <button onclick="submitReport()">報告を送信</button>
             </div>
@@ -2778,6 +2778,10 @@
             } else {
                 const audio = document.getElementById('bgm_' + selected);
                 if (audio) {
+                    // 音源ごとに録音レベルが違うため、個別に音量を補正して体感を揃える。
+                    // 焚き火は元音源が小さいので大きめ、森の鳥は大きいので抑えめにする。
+                    const volumeMap = { "forest": 0.55, "fire": 1.0 };
+                    audio.volume = volumeMap[selected] !== undefined ? volumeMap[selected] : 0.7;
                     audio.play().catch(e => console.log("再生ブロックされました", e));
                     const titleMap = { "forest": "🍃 森の鳥たち", "fire": "🔥 焚き火" };
                     setupMediaSession(titleMap[selected] || "環境音");

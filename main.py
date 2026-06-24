@@ -36,7 +36,8 @@ import base64
 import json
 import os
 
-# .env ファイルから環境変数を読み込む。APIキーの取得
+# .env ファイルから環境変数を読み込む。
+# APIキーなどの秘密情報はコードに直接書かず、ここから取得する。
 load_dotenv()
 
 # Google Books API キー。.env に「GOOGLE_BOOKS_API_KEY=...」の形式で設定する。
@@ -52,7 +53,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-# =====プッシュ通知(Web Push)の設定 =====
+# ===== プッシュ通知(Web Push)の設定 =====
 # 鍵はRenderの環境変数で設定する(VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)。
 # pywebpush未導入・鍵未設定の場合は通知機能だけが静かに無効になり、
 # アプリ本体は通常どおり動く。
@@ -97,7 +98,7 @@ Base = declarative_base()
 
 
 # --- データベースのモデル ---
-# 改良: 検索に使われる外部キー列へインデックスを付与（既存データ・APIの挙動は不変、参照のみ高速化）。
+# 検索に使われる外部キー列へインデックスを付与（既存データ・APIの挙動は不変、参照のみ高速化）。
 
 
 class Group(Base):
@@ -118,13 +119,15 @@ class User(Base):
     is_ai = Column(Boolean, default=False)
     strike_count = Column(Integer, default=0)
     profile_image = Column(String, nullable=True)
-    #門出（卒業）を一度でも経験したか。桜バッジの表示に使う。
+    # 門出（卒業）を一度でも経験したか。桜バッジの表示に使う。
     has_graduated = Column(Boolean, default=False)
-    #称号バッジ（運営が手動で付与）。開発者=大樹 / アドバイザー=雫 / テスター=双葉
+    # 称号バッジ（運営が手動で付与）。開発者=大樹 / アドバイザー=雫 / テスター=双葉
     is_developer = Column(Boolean, default=False)
     is_advisor = Column(Boolean, default=False)
     is_tester = Column(Boolean, default=False)
-    #認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
+    # 登録日時(UTC)。既存ユーザーは NULL。コホート分析に使用。
+    created_at = Column(DateTime, nullable=True, default=utcnow)
+    # 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
     auth_token = Column(String, nullable=True, index=True)
 
 
@@ -156,7 +159,7 @@ class Message(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
-#新機能: 掲示板メッセージへの応援リアクション（スタンプ）
+# 掲示板メッセージへの応援リアクション（スタンプ）
 class Reaction(Base):
     __tablename__ = "reactions"
     id = Column(Integer, primary_key=True, index=True)
@@ -179,7 +182,7 @@ class DailyGoal(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
-#プッシュ通知の購読情報(1ユーザー複数端末を許容)
+# プッシュ通知の購読情報(1ユーザー複数端末を許容)
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
     id = Column(Integer, primary_key=True, index=True)
@@ -206,6 +209,11 @@ def ensure_schema():
     if "auth_token" not in cols:
         with engine.connect() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN auth_token VARCHAR"))
+            conn.commit()
+    # 既存DBには列が無いため追加する。既存行は NULL のまま。
+    if "created_at" not in cols:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN created_at TIMESTAMP"))
             conn.commit()
 
 
@@ -277,7 +285,7 @@ class ConnectionManager:
         connections = self.active_connections.get(group_id)
         if not connections:
             return
-        # 改良: 送信に失敗した（切断済みの）接続をその場で除去し、
+        # 送信に失敗した（切断済みの）接続をその場で除去し、
         # 接続リストが無限に肥大化しないようにする。配信先・配信内容は従来と同一。
         dead: List[WebSocket] = []
         for connection in list(connections):
@@ -321,7 +329,7 @@ def get_custom_id(db: Session, is_ai: bool):
 # --- AIマッチングロジック ---
 AI_NAMES = ["[AI] サクラ", "[AI] ハルト", "[AI] ミナト", "[AI] ユイ", "[AI] メンター"]
 
-# 新機能: AIメンバーが学習報告に反応するときの応援メッセージ
+# AIメンバーが学習報告に反応するときの応援メッセージ
 AI_ENCOURAGEMENTS = [
     "ナイス学習です！その積み重ねが実を結びますよ✨",
     "今日もよく頑張りましたね🍵 しっかり休んでください",
@@ -331,7 +339,7 @@ AI_ENCOURAGEMENTS = [
     "継続は力なり、ですね。応援しています📣",
 ]
 
-# 新機能: オンボーディング: チーム参加時にAIが投稿する歓迎メッセージ。
+# オンボーディング: チーム参加時にAIが投稿する歓迎メッセージ。
 # 登録直後の掲示板が無言だと何をすべきか分からないため、名前入りで迎えて
 # 最初の行動（タイマーで学習→報告）を案内する。
 AI_WELCOMES = [
@@ -382,7 +390,7 @@ def adjust_group_members(db: Session, group_id: int, goal: str):
 
 
 def cleanup_floating_ais(db: Session):
-    """✨ 浮いたAI（group_id=NULLのAIメンバー）を物理削除する掃除処理。
+    """浮いたAI（group_id=NULLのAIメンバー）を物理削除する掃除処理。
 
     adjust_group_membersはAIを外す際にgroup_idをNULLにするだけなので、
     放置すると浮いたAIがDBに無限に溜まっていく。AIは一度浮くと二度と
@@ -453,7 +461,7 @@ def cleanup_floating_ais(db: Session):
 
 
 def cleanup_ai_only_groups(db: Session):
-    """✨ 人間が1人もいない「抜け殻グループ」を掃除する。
+    """人間が1人もいない「抜け殻グループ」を掃除する。
 
     最後の人間が卒業/キックで抜けると、adjust_group_membersがAIを
     3体に補充するため、AIだけのグループが残り続ける。夜間の人数点検は
@@ -516,7 +524,7 @@ def cleanup_ai_only_groups(db: Session):
 
 
 def cleanup_old_daily_goals(db: Session, days: int = 30):
-    """✨ 古い「今日の種」を掃除する(既定30日より前)。
+    """古い「今日の種」を掃除する(既定30日より前)。
     種は当日と翌日しか意味を持たないため、古いものは溜める価値がない。
     戻り値: 削除した件数
     """
@@ -551,7 +559,7 @@ def assign_group_logic(db: Session, user: User):
         user.group_id = target_group.id
         db.commit()
         adjust_group_members(db, target_group.id, target_group.goal)
-        # ✨ オンボーディング: 参加直後の掲示板に歓迎メッセージを置く。
+        # オンボーディング: 参加直後の掲示板に歓迎メッセージを置く。
         # 歓迎の失敗で登録そのものを失敗させないよう、ここだけで握りつぶす。
         try:
             ais = (
@@ -585,7 +593,7 @@ def assign_group_logic(db: Session, user: User):
 
 
 def send_study_reminders(db: Session):
-    """✨ 22時の学習リマインダー: 今日まだ報告していない購読者へ通知を送る。
+    """22時の学習リマインダー: 今日まだ報告していない購読者へ通知を送る。
     「今日」の判定は既存規約(UTC日付=芝生・サボり点検と同じ)。
     失効した購読(404/410)はその場で削除する。
     戻り値: (送信成功数, 掃除した失効購読数)
@@ -647,10 +655,10 @@ def send_study_reminders(db: Session):
 # --- 毎晩23:59に作動するサボり点検バッチ ---
 async def daily_check_task():
     print("🌿 みんスタ サボり監視バッチが正常に起動しました")
-    last_reminder_date = None  # ✨ 22時リマインダーの送信済み日(重複送信ガード)
+    last_reminder_date = None  # 22時リマインダーの送信済み日(重複送信ガード)
     while True:
         try:
-            # ✨ 22時(JST)の学習リマインダー。60秒間隔のループでも取りこぼさない
+            # 22時(JST)の学習リマインダー。60秒間隔のループでも取りこぼさない
             # よう「22時台でその日未送信なら送る」判定にしている(分==0判定は
             # ループのずれで飛ばす恐れがある)。タイムゾーンは明示的にJST。
             jst_now = datetime.now(JST)
@@ -738,7 +746,7 @@ async def daily_check_task():
                                 print(f"group {g.id} の人数調整に失敗: {fix_error}")
                     db.commit()
 
-                    #抜け殻グループの掃除: 人間が1人もいない（AIだけ/空の）
+                    # 抜け殻グループの掃除: 人間が1人もいない（AIだけ/空の）
                     # グループは、AIを浮かせてからGroup行ごと削除する。
                     # 浮かせたAIは、直後のcleanup_floating_aisがその晩のうちに回収する。
                     try:
@@ -751,7 +759,7 @@ async def daily_check_task():
                     except Exception as ghost_error:
                         print(f"抜け殻グループ掃除に失敗: {ghost_error}")
 
-                    #浮いたAIの掃除: 上の人数調整で外れた分も含めて、
+                    # 浮いたAIの掃除: 上の人数調整で外れた分も含めて、
                     # group_id=NULLのAIを毎晩ここで物理削除する。
                     # 失敗してもバッチ全体は止めない（翌晩リトライされる）。
                     try:
@@ -788,7 +796,7 @@ async def daily_check_task():
 
 
 # --- アプリのライフサイクル ---
-# 改良: 非推奨の @app.on_event("startup") から lifespan ハンドラへ移行。
+# 非推奨の @app.on_event("startup") から lifespan ハンドラへ移行。
 # 起動時にバッチを開始し、終了時には確実にキャンセルする（挙動は従来と同等）。
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -805,7 +813,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# 改良: allow_origins=["*"] と allow_credentials=True の併用はブラウザ仕様上
+# allow_origins=["*"] と allow_credentials=True の併用はブラウザ仕様上
 # 無効な組み合わせ。本アプリは Cookie 等の資格情報を用いない（同一オリジン配信）ため、
 # allow_credentials=False とし、設定を仕様準拠の正しい状態にする（実挙動は不変）。
 app.add_middleware(
@@ -921,7 +929,7 @@ def get_privacy():
 SW_JS = """self.addEventListener('install', function (event) { self.skipWaiting(); });
 self.addEventListener('activate', function (event) { event.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', function (event) { });
-// ✨ プッシュ通知: 22時の学習リマインダー等を表示する
+// push 通知の受信時にシステム通知を表示する
 self.addEventListener('push', function (event) {
     var data = {};
     try { data = event.data ? event.data.json() : {}; } catch (e) { }
@@ -960,24 +968,44 @@ async def websocket_endpoint(websocket: WebSocket, group_id: int):
 
 @app.post("/users/register")
 def register(user_data: dict, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user_data["email"]).first()
+    # 必須項目の欠落・空文字を検証する(未検証だと KeyError で 500 になる)。
+    email = (user_data.get("email") or "").strip()
+    password = user_data.get("password") or ""
+    name = (user_data.get("name") or "").strip()
+    goal = (user_data.get("goal") or "").strip()
+    if not email or not password or not name or not goal:
+        raise HTTPException(status_code=400, detail="必須項目が入力されていません")
+    # メールアドレスの形式チェック(@ とドメイン部の . の有無)。
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="メールアドレスの形式が正しくありません")
+    # bcrypt は72バイトを超えると例外を投げる。事前に検証して 400 を返す。
+    if len(password.encode("utf-8")) > 72:
+        raise HTTPException(
+            status_code=400,
+            detail="パスワードが長すぎます（日本語なら24文字、英数字なら72文字までを目安にしてください）",
+        )
+    if len(name) > 20:
+        raise HTTPException(status_code=400, detail="名前は20文字以内で入力してください")
+
+    existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     new_user = None
     try:
         salt = bcrypt.gensalt()
-        hashed_pw = bcrypt.hashpw(user_data["password"].encode("utf-8"), salt).decode(
+        hashed_pw = bcrypt.hashpw(password.encode("utf-8"), salt).decode(
             "utf-8"
         )
         new_human_id = get_custom_id(db, is_ai=False)
         new_user = User(
             id=new_human_id,
-            email=user_data["email"],
+            email=email,
             hashed_password=hashed_pw,
-            name=user_data["name"],
-            goal=user_data["goal"],
+            name=name,
+            goal=goal,
             target_date=user_data.get("target_date"),
             auth_token=issue_token(),
+            created_at=utcnow(),
         )
         db.add(new_user)
         db.commit()
@@ -1121,6 +1149,32 @@ async def graduate(
     return {"message": "Graduated", "has_graduated": True}
 
 
+@app.post("/users/{user_id}/join_group")
+async def join_group(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # group_id が NULL のユーザー(キック/卒業で離脱)を再マッチングする。
+    require_self(current_user, user_id)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # 所属済みなら何もしない(二重参加の防止)。
+    if user.group_id:
+        return {"message": "Already in a group", "group_id": user.group_id}
+    # goal が空だとマッチング対象を絞れないため 400 を返す。
+    if not (user.goal or "").strip():
+        raise HTTPException(status_code=400, detail="先に目標を設定してください")
+    # 再参加時は strike_count をリセットする。
+    user.strike_count = 0
+    db.commit()
+    assign_group_logic(db, user)
+    if user.group_id:
+        await manager.broadcast_to_group(user.group_id, "update")
+    return {"message": "Joined", "group_id": user.group_id}
+
+
 @app.post("/users/{user_id}/profile_image")
 async def update_profile_image(
     user_id: int,
@@ -1162,7 +1216,7 @@ async def update_name(
     return {"message": "Name updated", "name": user.name}
 
 
-# =====プッシュ通知(購読の登録/解除) =====
+# ===== プッシュ通知(購読の登録/解除) =====
 @app.get("/push/public-key")
 def get_push_public_key():
     # フロントが購読時に使う公開鍵。未設定なら機能オフを伝える。
@@ -1462,7 +1516,7 @@ def get_stats(
     db: Session = Depends(get_db),
 ):
     require_self(current_user, user_id)
-    # 改良: 合計の算出を DB 側の集計に委ねる（返却値は従来と同一）。
+    # 合計の算出を DB 側の集計に委ねる（返却値は従来と同一）。
     total = (
         db.query(func.coalesce(func.sum(Report.study_minutes), 0))
         .filter(Report.user_id == user_id)
@@ -1504,7 +1558,7 @@ def add_book(
     return {"message": "Book added"}
 
 
-# 変更：表紙画像のアップデートも処理できるように改良
+# 表紙画像のアップデートも処理できるように改良
 @app.post("/books/{book_id}/update")
 def update_book(
     book_id: int,
@@ -1582,7 +1636,7 @@ async def submit_report(
         db.add(msg)
         db.commit()
 
-        # 新機能: グループにいるAIメンバーが、一定の確率で応援メッセージを投稿する。
+        # グループにいるAIメンバーが、一定の確率で応援メッセージを投稿する。
         # 過疎なチームでも反応が返ってくることで「続けやすい」体験を作る。
         ai_members = (
             db.query(User)
@@ -1611,7 +1665,7 @@ async def submit_report(
             )
             db.add(ai_msg)
             if is_first_report:
-                # 👏はフロントの応援スタンプ定番セット（STICKERS）にある絵文字
+                # はフロントの応援スタンプ定番セット（STICKERS）にある絵文字
                 db.add(Reaction(message_id=msg.id, user_id=ai.id, emoji="👏"))
             db.commit()
 
@@ -1693,7 +1747,7 @@ def get_messages(
             u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
         }
 
-    # ✨ 新機能: 各メッセージへの応援リアクションを 1 クエリでまとめて取得する。
+    # 各メッセージへの応援リアクションを 1 クエリでまとめて取得する。
     msg_ids = [m.id for m in msgs]
     reactions_by_msg: Dict[int, list] = {}
     if msg_ids:
@@ -1738,8 +1792,16 @@ async def post_message(
         raise HTTPException(
             status_code=403, detail="このチームには投稿できません"
         )
+    # 空メッセージと過大な文字数を検証する。
+    content = (msg_data.get("content") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="メッセージが空です")
+    if len(content) > 1000:
+        raise HTTPException(
+            status_code=400, detail="メッセージは1000文字以内で入力してください"
+        )
     msg = Message(
-        group_id=group_id, user_id=current_user.id, content=msg_data["content"]
+        group_id=group_id, user_id=current_user.id, content=content
     )
     db.add(msg)
     db.commit()
@@ -1747,7 +1809,7 @@ async def post_message(
     return {"message": "Message posted"}
 
 
-# 新機能: メッセージへの応援リアクション（スタンプ）をトグルする。
+# メッセージへの応援リアクション（スタンプ）をトグルする。
 @app.post("/messages/{message_id}/reactions")
 async def toggle_reaction(
     message_id: int,

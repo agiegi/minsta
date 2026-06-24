@@ -378,7 +378,7 @@
             overflow-y: auto;
         }
 
-        /* ✨ 新機能用スタイル */
+        /* 追加スタイル */
         .reaction-bar {
             margin-top: 8px;
             display: flex;
@@ -444,7 +444,7 @@
         #monodeOverlay .mn-seal { margin-top: 1.6rem; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #a6dca0, #6fb86a); display: grid; place-items: center; font-size: 26px; box-shadow: 0 8px 22px rgba(110,184,106,0.45); }
         #monodeOverlay .mn-next { margin-top: 2rem; padding: 12px 40px; border: none; border-radius: 24px; background: linear-gradient(135deg, #f0a8c4, #e58aae); color: #fff; font-family: 'Zen Maru Gothic', sans-serif; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.1em; cursor: pointer; box-shadow: 0 6px 18px rgba(229,138,174,0.4); }
 
-        /* ✨ タブバー: 画面下部の固定ナビ。タブページはJSで切り替える */
+        /* タブバー: 画面下部の固定ナビ。タブページはJSで切り替える */
         .tab-page {
             display: none;
         }
@@ -453,7 +453,7 @@
             display: block;
         }
 
-        /* ✨ タブ切り替え時のスライドイン。方向に応じて左右から滑り込む。 */
+        /* タブ切り替え時のスライドイン。方向に応じて左右から滑り込む。 */
         .tab-page.slide-from-right {
             animation: slideFromRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
         }
@@ -545,7 +545,7 @@
         .onboard-dot.active {
             background: #66BB6A;
         }
-        /* ✨ 報告成功トースト（ポンッと弾んで出て、すっと消える） */
+        /* 報告成功トースト（ポンッと弾んで出て、すっと消える） */
         #reportToast {
             position: fixed;
             top: 38%;
@@ -828,7 +828,7 @@
                        box-shadow:0 4px 14px rgba(229,138,174,0.3);">
             </div>
 
-            <!-- ✨ タブページ: 既存カードは読み込み時にsetupTabLayout()でここへ移動する -->
+            <!-- タブページ: 既存カードは読み込み時にsetupTabLayout()でここへ移動する -->
             <div id="tabHome" class="tab-page active"></div>
             <div id="tabForest" class="tab-page"></div>
             <div id="tabPlaza" class="tab-page"></div>
@@ -861,6 +861,18 @@
                     <div id="teamForestVisual" class="forest-visual">🌱</div>
                     <div id="teamForestText" style="font-size: 11px; color: #66BB6A;">チーム合計: 0 分</div>
                 </div>
+            </div>
+
+            <!-- キック・卒業でチームを離れた人が、再びチームに参加するためのカード -->
+            <div id="joinGroupArea" class="card" style="display: none; text-align: center; background: #E8F5E9; border: 1px solid #C8E6C9;">
+                <div style="font-size: 15px; font-weight: bold; color: #2E7D32; margin-bottom: 8px;">今はどのチームにも所属していません</div>
+                <div style="font-size: 12px; color: #66BB6A; line-height: 1.7; margin-bottom: 14px;">
+                    同じ目標の仲間と、もう一度3人で並走しませんか。<br>あなたのペースで、いつでも始められます。
+                </div>
+                <button id="joinGroupBtn" onclick="joinGroup()"
+                    style="background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%); color: #fff; border: none; border-radius: 30px; padding: 14px 32px; font-size: 15px; font-weight: bold; box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);">
+                    チームに参加する
+                </button>
             </div>
 
             <div id="rankBox" class="card"
@@ -1187,7 +1199,7 @@
 
     <script>
         const API_URL = '';
-        let justRegistered = false; // ✨ 登録直後の初回ガイド表示用
+        let justRegistered = false; // 登録直後の初回ガイド表示用
         let currentUserId = null, currentUserName = "", currentGroupId = null, currentTargetDate = null, currentGoal = "";
         // 称号バッジ画像（base64埋め込み。開発者=大樹/アドバイザー=雫/テスター=双葉/達成=桜）
         const BADGE_IMAGES = {
@@ -1239,10 +1251,10 @@
             }
             document.getElementById('memberDetailModal').style.display = 'flex';
         }
-        // ✨ 認証: ログイン時に受け取るトークン。全API通信の本人確認に使う。
+        // 認証: ログイン時に受け取るトークン。全API通信の本人確認に使う。
         let authToken = null;
 
-        // ✨ 認証: すべてのAPI通信はこの関数を通す。ログイン中ならトークンを
+        // 認証: すべてのAPI通信はこの関数を通す。ログイン中ならトークンを
         // Authorization ヘッダーに自動で付与する。サーバーが 401（セッション無効）を
         // 返したら、ログイン画面へ戻す。
         async function apiFetch(path, options = {}) {
@@ -1293,7 +1305,7 @@
             return (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) ? value : fb;
         }
 
-        // ===== ✨ 新機能用のヘルパー群 =====
+        // ===== 新機能用のヘルパー群 =====
 
         // 応援スタンプの定番セット
         const STICKERS = ['👏', '🔥', '💪', '🎉'];
@@ -1327,7 +1339,7 @@
             }
         }
 
-        // ✨ 日付の基準をすべて日本時間(JST)に統一するための共通関数。
+        // 日付の基準をすべて日本時間(JST)に統一するための共通関数。
         // reported_at等はDB上UTCで保存されているため、日付の境界(その日の0時)を
         // 日本時間で判定するには +9時間してから日付を取り出す必要がある。
         // 例: UTC 2026-06-14T16:30(=JST 6/15 01:30)は「6/15」として扱う。
@@ -1782,7 +1794,7 @@
                 });
             }
 
-            // ✨ 新機能: 掲示板の応援スタンプのクリック処理
+            // 掲示板の応援スタンプのクリック処理
             const chat = document.getElementById('chatArea');
             if (chat) {
                 chat.addEventListener('click', (e) => {
@@ -1801,7 +1813,7 @@
 
             setupDelegatedEvents();
 
-            // ✨ 認証: 保存したトークンでセッションを復元する。
+            // 認証: 保存したトークンでセッションを復元する。
             const savedToken = localStorage.getItem('minsta_token');
             if (savedToken) {
                 authToken = savedToken;
@@ -1872,7 +1884,7 @@
 
         function setGoal(text) { setGoalFor('regGoal', 'tagsContainer', text); }
 
-        // ===== ✨ タブバーUI =====
+        // ===== タブバーUI =====
         // 既存カードをHTMLの位置から各タブへ「移動」する。DOM要素の移動なので
         // 要素への参照やイベントはそのまま保たれ、既存コードは変更不要。
         let currentTab = 'tabHome';
@@ -1894,6 +1906,7 @@
             move(cardOf('historyList'), 'tabHome');
             // 森: チームメイト+木(groupArea) → 称号(rankBox) → サマリー → グラフ → 芝生
             move(document.getElementById('groupArea'), 'tabForest');
+            move(document.getElementById('joinGroupArea'), 'tabForest');
             move(document.getElementById('rankBox'), 'tabForest');
             move(cardOf('weeklyMinutes'), 'tabForest');
             move(cardOf('studyChart'), 'tabForest');
@@ -1902,11 +1915,11 @@
             move(cardOf('chatArea'), 'tabPlaza');
         }
 
-        // タブの並び順（スライド方向の計算に使う）
+        // タブの並び順(スライド方向の判定に使う)
         const TAB_SEQUENCE = ['tabHome', 'tabForest', 'tabPlaza', 'tabSettings'];
 
         function switchTab(tabId, direction) {
-            // direction: 'right'(次のタブへ=右から入る) / 'left'(前のタブへ=左から入る) / 未指定(自動計算)
+            // direction: right/left。未指定なら並び順から判定する。
             const prevTab = currentTab;
             currentTab = tabId;
 
@@ -1922,10 +1935,10 @@
             document.querySelectorAll('.tab-page').forEach(p => {
                 const isActive = (p.id === tabId);
                 p.classList.toggle('active', isActive);
-                // 一旦スライド用クラスを外し、表示するページにだけ方向に応じて付け直す
+                // スライド用クラスを一旦外し、表示ページにのみ付け直す
                 p.classList.remove('slide-from-right', 'slide-from-left');
                 if (isActive && direction) {
-                    // リフローを挟んでアニメーションを確実に再生させる
+                    // リフローを挟んでアニメーションを再生
                     void p.offsetWidth;
                     p.classList.add(direction === 'right' ? 'slide-from-right' : 'slide-from-left');
                 }
@@ -1952,10 +1965,8 @@
 
         setupTabLayout();
 
-        // ===== ✨ 横スワイプでのタブ移動 =====
-        // 画面を左右にスワイプすると隣のタブへ移動する。タップ(タブボタン)が主役で、
-        // スワイプは補助。switchTab()をそのまま呼ぶので、グラフ再描画や新着ドット消去
-        // などの既存処理は自動で効く。
+        // ===== 横スワイプでのタブ移動 =====
+        // 左右スワイプで隣のタブへ移動する。switchTab() を呼ぶだけで既存処理も走る。
         (function setupSwipeNavigation() {
             // タブの並び順。この配列上で「ひとつ右/左」を計算する。
             const TAB_ORDER = ['tabHome', 'tabForest', 'tabPlaza', 'tabSettings'];
@@ -2020,7 +2031,7 @@
             }, { passive: true });
         })();
 
-        // ===== ✨ 初回オンボーディング =====
+        // ===== 初回オンボーディング =====
         // 登録直後に1回だけ、3ステップの簡単な使い方を見せて最初の報告へ誘導する。
         // 「義理で登録した人」ではなく「これから興味で来る新規ユーザー」が、
         // 何をするアプリかを掴んで最初の1歩を踏めるようにするのが狙い。
@@ -2160,7 +2171,7 @@
             if (arrow) arrow.innerText = open ? '▼' : '▶';
         }
 
-        // ===== ✨ プッシュ通知(22時の学習リマインダー) =====
+        // ===== プッシュ通知(22時の学習リマインダー) =====
         // iPhoneはiOS16.4以降+「ホーム画面に追加」したPWAでのみ使える。
         function pushSupported() {
             return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -2254,7 +2265,7 @@
             }
         }
 
-        // ✨ 表記ゆれ対策: 目標変更モーダルにも登録画面と同じタグ一覧を出す。
+        // 表記ゆれ対策: 目標変更モーダルにも登録画面と同じタグ一覧を出す。
         // 一覧の実体は登録画面の1箇所だけにし、モーダルを開くたびに複製する
         // （将来タグを追加しても自動で両方に反映される）。
         function setupEditGoalTags() {
@@ -2301,7 +2312,7 @@
                 if (!res.ok) throw new Error("すでに登録されているメールアドレスか、エラーが発生しました。");
 
                 const data = await res.json();
-                justRegistered = true; // ✨ 初回オンボーディング表示のためのフラグ
+                justRegistered = true; // 初回オンボーディング表示のためのフラグ
                 alert(`🌱 登録完了！\n\nあなたのユーザーIDは【 ${data.user.id} 】です！\nようこそ、みんスタへ！`);
 
                 document.getElementById('loginEmail').value = email;
@@ -2326,7 +2337,7 @@
                 if (!res.ok) throw new Error("メールアドレスかパスワードが間違っています。");
 
                 const data = await res.json();
-                // ✨ 認証: 発行されたトークンを保存し、以降の通信に使う。
+                // 認証: 発行されたトークンを保存し、以降の通信に使う。
                 authToken = data.token;
                 localStorage.setItem('minsta_token', authToken);
                 currentUserId = data.user.id;
@@ -2342,7 +2353,7 @@
             } catch (e) { alert(e.message); }
         }
 
-        // ✨ 更新ボタン: ページ全体は再読み込みせず、表示データだけを取り直す。
+        // 更新ボタン: ページ全体は再読み込みせず、表示データだけを取り直す。
         // PWAとしてホーム画面から起動するとブラウザの更新（プルトゥリフレッシュ）が
         // 使えないため、その代わりの手段として用意している。
         let isRefreshing = false;
@@ -2362,7 +2373,7 @@
         }
 
         async function logout() {
-            // ✨ 認証: サーバー側のトークンも無効化してからログアウトする。
+            // 認証: サーバー側のトークンも無効化してからログアウトする。
             try {
                 await apiFetch('/users/logout', { method: 'POST' });
             } catch (e) { }
@@ -2499,7 +2510,7 @@
             }
         }
 
-        // ✨ 変更：画像のBase64は内部配列から安全に取得する
+        // 画像のBase64は内部配列から安全に取得する
         // 改良: イベント委譲から呼ばれるため event 引数を廃止し、bookId は数値に正規化する。
         function openEditBookModal(bookId, title, color) {
             editingBookId = parseInt(bookId);
@@ -2548,7 +2559,7 @@
                 const res = await apiFetch(`/books/${editingBookId}/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // ✨ 変更：変更した画像データも一緒に送信
+                    // 変更した画像データも一緒に送信
                     body: JSON.stringify({ color: color, cover_image: currentEditBase64Image })
                 });
                 if (!res.ok) throw new Error("変更の保存に失敗しました");
@@ -2714,8 +2725,8 @@
         }
 
 
-        // ✨ 変更: バックグラウンド再生中にロック画面やメディア通知へ表示される
-        // アイコンを、アプリ本体（manifest.json）と同じ双葉「🌱」に統一する。
+        // バックグラウンド再生中にロック画面やメディア通知へ表示される
+        // アイコンを manifest.json と揃える。
         // 従来は外部サイトの画像URLを参照していたが、絵文字を描いた画像を内部生成し
         // 外部依存をなくす（オフラインでも正しく表示される）。
         let appIconDataUrl = null;
@@ -2843,7 +2854,7 @@
                 updateDisplay();
                 fetchData();
                 alert("🍅 25分の集中セッションが完了しました！\n自動的に学習記録（マス）が追加されました。");
-                // ✨ 新機能: 続けて5分間の休憩タイマーを提案する
+                // 続けて5分間の休憩タイマーを提案する
                 if (confirm("☕ 5分間の休憩をはじめますか？")) startBreak();
             }).catch(e => {
                 alert("通信エラーが発生しましたが、25分は経過しました。手動で報告を送信してください。");
@@ -2941,6 +2952,24 @@
         }
 
 
+        // group_id が NULL のユーザーを再マッチングする。
+        async function joinGroup() {
+            const btn = document.getElementById('joinGroupBtn');
+            // goal が空ならマッチングできないため、目標設定を促す。
+            if (!currentGoal || !currentGoal.trim()) {
+                alert("先に目標を設定してください。設定すると、同じ目標の仲間とチームを組めます。");
+                return;
+            }
+            if (btn) { btn.disabled = true; btn.textContent = "参加しています…"; }
+            try {
+                await apiFetch(`/users/${currentUserId}/join_group`, { method: 'POST' });
+                await fetchData(); // 最新のチーム状態を反映
+            } catch (e) {
+                alert("チームへの参加に失敗しました。通信状況を確認して、もう一度お試しください。");
+                if (btn) { btn.disabled = false; btn.textContent = "チームに参加する"; }
+            }
+        }
+
         async function submitReport() {
             const content = document.getElementById('reportContent').value, mins = document.getElementById('studyMinutes').value;
             const bookId = document.getElementById('activeBookSelect').value;
@@ -2959,20 +2988,19 @@
             if (timerObj) clearInterval(timerObj);
             currentSecondsDisplay = 0; updateDisplay();
             resetTimerButtons();
-            showReportToast(); // ✨ 報告できた手応えを出す
+            showReportToast(); // 報告できた手応えを出す
             fetchData();
         }
 
-        // ✨ 報告成功の合図。「報告しました！」がポンッと弾んで出て、すっと消える。
-        // 一番大事な"行動が効いた瞬間"に手応えを与えるためのマイクロインタラクション。
+        // 報告成功時のトースト表示。
         function showReportToast() {
             const toast = document.getElementById('reportToast');
             if (!toast) return;
-            // アニメーションを毎回やり直すため、一度クラスを外してから付け直す
+            // クラスを外して付け直し、アニメーションを再生する(リフローを挟む)。
             toast.classList.remove('show');
-            void toast.offsetWidth; // リフロー強制（これでアニメがリセットされる）
+            void toast.offsetWidth;
             toast.classList.add('show');
-            // 対応端末(主にAndroid)では軽い振動も添える。iPhoneは非対応だが無害。
+            // Vibration API 対応端末のみ振動する(iOS Safari は非対応)。
             if (navigator.vibrate) {
                 try { navigator.vibrate(40); } catch (e) { }
             }
@@ -3106,7 +3134,7 @@
         }
 
         async function fetchData() {
-            loadSeeds(); // ✨ 今日の種(待たない: 本体の読み込みを遅らせない)
+            loadSeeds(); // 今日の種(待たない: 本体の読み込みを遅らせない)
             // --- 自分の情報を取得（これが取れないと何も表示できないので最初に） ---
             let me;
             try {
@@ -3160,7 +3188,7 @@
                 drawCustomHeatmap(reports);
                 renderWeeklySummary(reports);
 
-                // ✨ 新機能: 連続学習日数（ストリーク）を表示する
+                // 連続学習日数（ストリーク）を表示する
                 const streak = calcStreak(reports);
                 const streakEl = document.getElementById('streakDisplay');
                 if (streak > 0) {
@@ -3238,13 +3266,14 @@
             // --- チーム（メンバー・掲示板） ---
             if (currentGroupId) {
                 document.getElementById('groupArea').style.display = 'block';
+                document.getElementById('joinGroupArea').style.display = 'none';
 
                 // メンバー一覧と「みんなの森」
                 try {
                     const memRes = await apiFetch(`/groups/${currentGroupId}/members`);
                     const members = await memRes.json();
 
-                    // ✨ 新機能: チーム合計時間で育つ「みんなの森」を描画
+                    // チーム合計時間で育つ「みんなの森」を描画
                     renderTeamForest(members);
 
                     // チームは「競争」ではなく「並走」がコンセプトのため、
@@ -3282,12 +3311,12 @@
                         let iconHtml = m.profile_image
                             ? `<img src="${escapeHtml(m.profile_image)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 5px;">`
                             : ``;
-                        // ✨ 新機能: システムメッセージ以外には応援スタンプを表示する
+                        // システムメッセージ以外には応援スタンプを表示する
                         const reactionHtml = rawName.includes('システム') ? '' : renderReactions(m);
                         return `<div class="msg ${cls}"><b>${iconHtml}${escapeHtml(rawName)}</b><br>${escapeHtml(m.content)}${reactionHtml}</div>`;
                     }).join('');
                     if (isScrolledToBottom) chatArea.scrollTop = chatArea.scrollHeight;
-                    // ✨ 広場タブの新着ドット: 別タブにいる間に新しい投稿が来たら知らせる
+                    // 広場タブの新着ドット: 別タブにいる間に新しい投稿が来たら知らせる
                     latestMessageId = msgs.length ? Math.max(...msgs.map(m => m.id || 0)) : 0;
                     if (currentTab === 'tabPlaza' || lastSeenMessageId === 0) {
                         lastSeenMessageId = latestMessageId; // 閲覧中・初回読み込みは既読扱い
@@ -3300,9 +3329,11 @@
                 }
             } else {
                 document.getElementById('groupArea').style.display = 'none';
+                // どのチームにも属していないので、再参加カードを出す
+                document.getElementById('joinGroupArea').style.display = 'block';
             }
 
-            maybeShowOnboarding(); // ✨ 登録直後なら初回ガイドを表示
+            maybeShowOnboarding(); // 登録直後なら初回ガイドを表示
         }
 
         function drawCustomHeatmap(reports) {

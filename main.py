@@ -1863,10 +1863,6 @@ async def toggle_reaction(
     return {"message": "Reaction toggled"}
 
 
-# セキュリティ改良: 書籍検索のサーバー側プロキシ。
-# 従来は user.html に Google Books API キーを直書きしていたため、ブラウザから
-# キーが丸見えだった。検索をサーバーが代行することで、キーは .env（サーバー）に
-# のみ存在し、ブラウザには一切渡らなくなる。ログイン中ユーザーのみ利用できる。
 @app.get("/api/books/search")
 def search_books(
     q: str,

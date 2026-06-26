@@ -815,7 +815,7 @@
 
             <div id="countdownBox" class="card"
                 style="text-align: center; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); display: none;">
-                <div style="font-size: 14px; color: #1565C0; font-weight: bold;">🎯 目標の期日まで</div>
+                <div style="font-size: 14px; color: #1565C0; font-weight: bold;">目標の期日まで</div>
                 <div id="daysLeft" style="font-size: 36px; font-weight: bold; color: #0D47A1; margin: 5px 0;">あと -- 日
                 </div>
                 <div id="goalDateText" style="font-size: 12px; color: #1976D2;"></div>
@@ -1115,7 +1115,7 @@
 
     <div id="goalModal" class="modal">
         <div class="modal-content">
-            <h3 id="goalModalTitle" style="margin-top:0;">🎯 目標の変更</h3>
+            <h3 id="goalModalTitle" style="margin-top:0;">目標の変更</h3>
             <p id="goalModalNote" style="font-size:11px; color:#E53935; font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
             <input type="text" id="editGoal" placeholder="🔍 新しい目標を入力・検索"
                 oninput="filterTagsIn('editGoal', 'editTagsContainer')">
@@ -1448,7 +1448,7 @@
                     cancelBreak();
                     document.getElementById('display').innerText = '00:00:00';
                     try { document.getElementById('bellSound').play(); } catch (e) { }
-                    alert('☕ 休憩おわり！次の25分も頑張りましょう🍅');
+                    alert('☕ 休憩おわり！次の25分も頑張りましょう');
                     return;
                 }
                 const mm = Math.floor(remain / 60).toString().padStart(2, '0');
@@ -2836,13 +2836,14 @@
 
         function handlePomodoroEnd() {
             clearInterval(timerObj);
+            timerObj = null;
             pauseCurrentBGM();
             try { document.getElementById('bellSound').play(); } catch (e) { }
 
             resetTimerButtons();
             const bookId = document.getElementById('activeBookSelect').value;
             let content = document.getElementById('reportContent').value;
-            if (!content) { content = "🍅 25分のポモドーロを完了しました！"; }
+            if (!content) { content = "25分のポモドーロを完了しました！"; }
 
             apiFetch(`/reports/submit`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2853,7 +2854,7 @@
                 currentSecondsDisplay = 0;
                 updateDisplay();
                 fetchData();
-                alert("🍅 25分の集中セッションが完了しました！\n自動的に学習記録（マス）が追加されました。");
+                alert("25分の集中セッションが完了しました！\n自動的に学習記録（マス）が追加されました。");
                 // 続けて5分間の休憩タイマーを提案する
                 if (confirm("☕ 5分間の休憩をはじめますか？")) startBreak();
             }).catch(e => {
@@ -2922,6 +2923,7 @@
 
         function stopTimer() {
             if (timerObj) clearInterval(timerObj);
+            timerObj = null;
             pauseCurrentBGM();
             let mins = 0;
             if (!isPomodoro) {
@@ -2986,9 +2988,10 @@
             }
             document.getElementById('reportContent').value = ""; document.getElementById('studyMinutes').value = "0";
             if (timerObj) clearInterval(timerObj);
+            timerObj = null;
             currentSecondsDisplay = 0; updateDisplay();
             resetTimerButtons();
-            showReportToast(); // 報告できた手応えを出す
+            showReportToast(); // 報告成功のトーストを表示
             fetchData();
         }
 
@@ -3384,7 +3387,7 @@
             }
         }
 
-        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="🎯 目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; const a=document.getElementById('goalAchieveArea'); if(a)a.style.display='block'; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; setupEditGoalTags(); document.getElementById('goalModal').style.display = 'flex'; }
+        function openGoalModal() { const t=document.getElementById('goalModalTitle'); const n=document.getElementById('goalModalNote'); if(t)t.innerText="目標の変更"; if(n)n.innerText="※目標を変更すると、今のチームを卒業します。"; const a=document.getElementById('goalAchieveArea'); if(a)a.style.display='block'; document.getElementById('editGoal').value = currentGoal; document.getElementById('editDate').value = currentTargetDate || ""; setupEditGoalTags(); document.getElementById('goalModal').style.display = 'flex'; }
         function closeGoalModal() { document.getElementById('goalModal').style.display = 'none'; }
 
         async function updateGoal() {

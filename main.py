@@ -1099,16 +1099,27 @@ async def update_goal(
         raise HTTPException(status_code=404, detail="User not found")
     old_group_id = user.group_id
     old_goal = user.goal
-    user.goal = goal_data["goal"]
+    new_goal = goal_data["goal"]
+    # 目標が変わった場合のみグループを再編成する。期日(target_date)だけの
+    # 変更ではグループを維持する(同じ目標の仲間と並走を続けられるように)。
+    goal_changed = (new_goal != old_goal)
+    user.goal = new_goal
     user.target_date = goal_data.get("target_date")
-    user.group_id = None
-    user.strike_count = 0
-    db.commit()
-    if old_group_id:
-        adjust_group_members(db, old_group_id, old_goal)
-        await manager.broadcast_to_group(old_group_id, "update")
-    assign_group_logic(db, user)
-    await manager.broadcast_to_group(user.group_id, "update")
+    if goal_changed:
+        user.group_id = None
+        user.strike_count = 0
+        db.commit()
+        if old_group_id:
+            adjust_group_members(db, old_group_id, old_goal)
+            await manager.broadcast_to_group(old_group_id, "update")
+        assign_group_logic(db, user)
+        if user.group_id:
+            await manager.broadcast_to_group(user.group_id, "update")
+    else:
+        db.commit()
+        # 期日だけ変わった場合も、チームメイトの画面に反映する。
+        if user.group_id:
+            await manager.broadcast_to_group(user.group_id, "update")
     return {"message": "Goal updated"}
 
 

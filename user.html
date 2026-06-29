@@ -834,14 +834,14 @@
             <div id="tabPlaza" class="tab-page"></div>
             <div id="tabSettings" class="tab-page">
                 <div class="card">
-                    <h3 style="margin-top:0;">⚙️ 設定</h3>
+                    <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><svg width="20" height="20" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>設定</h3>
                     <button onclick="openProfileModal()">プロフィール（名前・画像）</button>
                     <button onclick="openGoalModal()">目標・期日の変更</button>
                     <button onclick="logout()"
                         style="background: #CAC1AC; box-shadow: none;">ログアウト</button>
                 </div>
                 <div class="card">
-                    <h3 style="margin-top:0; font-size:15px;">🔔 通知</h3>
+                    <h3 style="margin-top:0; font-size:15px; display:flex; align-items:center; gap:8px;"><svg width="17" height="17" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M11.68 2.009A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673c-.824-.85-1.678-1.731-2.21-3.348"/><circle cx="18" cy="5" r="3"/></svg>通知</h3>
                     <p style="font-size:12px; color:#7A6F5D; margin:0;">
                         その日まだ学習していないとき、22時にお知らせします。</p>
                     <p id="pushStatus" style="font-size:11px; color:#8D6E63; margin:6px 0 0 0;"></p>
@@ -963,15 +963,13 @@
                     <button onclick="startPomodoro()" id="pomoBtn" class="pomodoro-btn">25分 集中</button>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button onclick="togglePause()" id="pauseBtn" style="background:#FFCA28; color:#3E2723;" disabled>⏸
-                        一時停止</button>
-                    <button onclick="stopTimer()" id="stopBtn" style="background:#EF5350;" disabled>⏹ 終了して記録</button>
+                    <button onclick="togglePause()" id="pauseBtn" style="background:#FFCA28; color:#3E2723;" disabled>一時停止</button>
+                    <button onclick="stopTimer()" id="stopBtn" style="background:#EF5350;" disabled>終了して記録</button>
                 </div>
 
                 <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #EAE5D9; text-align: center;">
                     <label
-                        style="font-size: 12px; font-weight: bold; color: #5D4037; display: block; margin-bottom: 5px;">🎧
-                        集中を深める環境音</label>
+                        style="font-size: 12px; font-weight: bold; color: #5D4037; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px;"><svg width="15" height="15" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>集中を深める環境音</label>
                     <select id="bgmSelect" onchange="handleSoundChange()"
                         style="font-weight: bold; color: #3E2723; background: #F3F0E8; border: none; box-shadow: none;">
                         <option value="none">🔇 無音 (OFF)</option>
@@ -1011,7 +1009,7 @@
             </div>
 
             <div class="card">
-                <h3 style="margin-top: 0; font-size: 14px;">📊 参考書ごとの学習割合</h3>
+                <h3 style="margin-top: 0; font-size: 14px; display:flex; align-items:center; gap:8px;"><svg width="16" height="16" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 13H7"/><path d="M19 9h-4"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/><rect x="15" y="5" width="4" height="12" rx="1"/><rect x="7" y="8" width="4" height="9" rx="1"/></svg>参考書ごとの学習割合</h3>
                 <div style="max-width: 230px; margin: 15px auto 0 auto;">
                     <canvas id="studyChart"></canvas>
                 </div>
@@ -1108,7 +1106,7 @@
 
     <div id="profileModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0;">👤 プロフィールの設定</h3>
+            <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><svg width="20" height="20" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>プロフィールの設定</h3>
             <div style="margin-bottom: 20px;">
                 <label style="display:block; font-size:13px; color:#7A6F5D; margin-bottom:6px;">ニックネーム</label>
                 <input type="text" id="nameInput" maxlength="20" placeholder="ニックネーム"
@@ -1116,7 +1114,7 @@
                 <button onclick="saveName()" style="background: #4CAF50; margin-top:10px; width:100%;">ニックネームを保存</button>
             </div>
             <hr style="border:none; border-top:1px solid #EAE5D9; margin:16px 0;">
-            <h3 style="margin-top:0; font-size:15px;">👤 プロフィール画像の設定</h3>
+            <h3 style="margin-top:0; font-size:15px; display:flex; align-items:center; gap:8px;"><svg width="17" height="17" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>プロフィール画像の設定</h3>
             <input type="file" id="profileImageInput" accept="image/*" onchange="previewProfileImage(event)"
                 style="font-size: 12px;">
             <div style="text-align:center; margin-top:10px;">
@@ -2129,7 +2127,7 @@
                                 style="cursor:${!s.achieved && kind === 'today' ? 'pointer' : 'default'}; font-size:16px;">${s.achieved ? '🌱' : '⬜'}</span>
                             <span style="flex:1; font-size:13px; ${s.achieved ? 'text-decoration:line-through; color:#9CCC9C;' : 'color:#5D4037;'}">${escapeHtml(s.content)}</span>
                             <span onclick="deleteSeed(${s.id})"
-                                style="cursor:pointer; color:#CAC1AC; font-size:14px; padding:0 4px;">✕</span>
+                                style="cursor:pointer; color:#CAC1AC; padding:0 4px; display:inline-flex; align-items:center;"><svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
                         </div>`).join('');
                 }
                 const addEl = document.getElementById(addId);
@@ -2907,7 +2905,7 @@
         }
 
         function prepareTimerUI() {
-            document.getElementById('pauseBtn').innerText = "⏸ 一時停止";
+            document.getElementById('pauseBtn').innerText = "一時停止";
             document.getElementById('pauseBtn').style.background = "#FFCA28";
             document.getElementById('pauseBtn').style.color = "#3E2723";
             document.getElementById('startBtn').disabled = true; document.getElementById('pomoBtn').disabled = true;
@@ -2925,14 +2923,14 @@
                 accumulatedSeconds += Math.floor((now - timerStartTime) / 1000);
 
                 const btn = document.getElementById('pauseBtn');
-                btn.innerText = "▶ 再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
+                btn.innerText = "再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
                 isPaused = true;
             } else {
                 playCurrentBGM();
                 timerStartTime = Date.now();
 
                 const btn = document.getElementById('pauseBtn');
-                btn.innerText = "⏸ 一時停止"; btn.style.background = "#FFCA28"; btn.style.color = "#3E2723";
+                btn.innerText = "一時停止"; btn.style.background = "#FFCA28"; btn.style.color = "#3E2723";
                 isPaused = false;
                 timerObj = setInterval(timerTick, 500);
             }
@@ -2950,7 +2948,7 @@
             }
             document.getElementById('studyMinutes').value = mins;
             const btn = document.getElementById('pauseBtn');
-            btn.innerText = "▶ 再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
+            btn.innerText = "再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
             btn.disabled = false; isPaused = true;
             document.getElementById('startBtn').disabled = false; document.getElementById('pomoBtn').disabled = false; document.getElementById('stopBtn').disabled = true;
         }
@@ -2959,7 +2957,7 @@
             document.getElementById('startBtn').disabled = false;
             document.getElementById('pomoBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true; document.getElementById('pauseBtn').disabled = true;
-            document.getElementById('pauseBtn').innerText = "⏸ 一時停止"; isPaused = false;
+            document.getElementById('pauseBtn').innerText = "一時停止"; isPaused = false;
         }
 
         function updateDisplay() {
@@ -3232,7 +3230,7 @@
                         // 改良: 削除アイコンのクリックはイベント委譲で処理し、報告内容は
                         // エスケープして表示する（記録内容に記号が含まれても安全）。
                         return `<div style="background:white; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid #EAE5D9; position:relative;">
-                        <div data-action="delete-report" data-report-id="${r.id}" style="position:absolute; top:8px; right:8px; cursor:pointer; font-size:14px; opacity:0.6; transition:0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="この記録を削除">🗑️</div>
+                        <div data-action="delete-report" data-report-id="${r.id}" style="position:absolute; top:8px; right:8px; cursor:pointer; opacity:0.6; transition:0.2s; display:flex; align-items:center;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="この記録を削除"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
                         <div style="font-size:10px; color:#888; margin-bottom:4px;">📅 ${dateStr}</div>
                         <div style="line-height:1.4; padding-right:20px;">${bookLabel} ${escapeHtml(r.content)} <span style="font-weight:bold; color:#2E7D32;">(${r.study_minutes}分)</span></div>
                     </div>`;

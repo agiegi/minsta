@@ -8,7 +8,7 @@
 
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192.png?v=2">
-    <meta name="theme-color" content="#66BB6A">
+    <meta name="theme-color" content="var(--accent)">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="みんスタ">
@@ -25,27 +25,53 @@
             --bg-grad-to: #CAC1AC;
             --bg: #FCF8EE;
             --card: #FFFEF8;
+            --card-plain: #FFFFFF;
             --text: #3E2723;
             --text-sub: #8D6E63;
+            --text-sub2: #7A6F5D;
             --border: #EAE5D9;
+            --border-soft: #F3F0E8;
+            --muted: #CAC1AC;
             --accent: #66BB6A;
+            --accent-strong: #4CAF50;
+            --accent-light: #A5D6A7;
             --heading: #2E7D32;
             --soft: #E8F5E9;
             --soft-border: #C8E6C9;
+            --info-bg: #E3F2FD;
+            --info-bg2: #BBDEFB;
+            --info-text: #1565C0;
+            --grass-empty: #2A2A2A;
+            --warn: #E53935;
+            --warn-soft: #EF5350;
+            --amber: #FFCA28;
         }
         /* ===== ダークテーマ（温かみのある夜） ===== */
         body.dark {
             --bg-grad-from: #1F1B18;
             --bg-grad-to: #14110F;
             --bg: #181513;
-            --card: #221E1A;
+            --card: #262119;
+            --card-plain: #2A241E;
             --text: #EFE7DA;
-            --text-sub: #A89685;
-            --border: #332C26;
+            --text-sub: #B5A491;
+            --text-sub2: #A89685;
+            --border: #3A332B;
+            --border-soft: #2E2820;
+            --muted: #4A4138;
             --accent: #7CC47F;
+            --accent-strong: #6BB56F;
+            --accent-light: #5E8C60;
             --heading: #9CC8A0;
-            --soft: #1F261F;
-            --soft-border: #333E33;
+            --soft: #232B22;
+            --soft-border: #36412F;
+            --info-bg: #1E2A38;
+            --info-bg2: #2A3E50;
+            --info-text: #7FB0D8;
+            --grass-empty: #36302A;
+            --warn: #E57373;
+            --warn-soft: #C75C5C;
+            --amber: #E0A93A;
         }
         body {
             font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Quicksand', sans-serif;
@@ -803,15 +829,15 @@
                 </div>
 
                 <label
-                    style="font-size: 11px; color: #8D6E63; display: block; text-align: left; margin: 10px 0 2px 5px;">📅
+                    style="font-size: 11px; color: var(--text-sub); display: block; text-align: left; margin: 10px 0 2px 5px;">📅
                     目標の期日（任意）</label>
-                <input type="date" id="regDate" style="color: #5D4037;">
+                <input type="date" id="regDate" style="color: var(--text-sub);">
 
                 <div style="display:flex; align-items:flex-start; gap:8px; margin:14px 5px 4px; text-align:left;">
                     <input type="checkbox" id="regAgree" style="width:auto; margin:3px 0 0 0; flex-shrink:0;">
-                    <label for="regAgree" style="font-size:12px; color:#5D4037; line-height:1.6; cursor:pointer;">
-                        <a href="/terms" target="_blank" style="color:#2E7D32;">利用規約</a>および<a href="/privacy"
-                            target="_blank" style="color:#2E7D32;">プライバシーポリシー</a>に同意します（未成年の場合は保護者の同意を得ています）
+                    <label for="regAgree" style="font-size:12px; color:var(--text-sub); line-height:1.6; cursor:pointer;">
+                        <a href="/terms" target="_blank" style="color:var(--heading);">利用規約</a>および<a href="/privacy"
+                            target="_blank" style="color:var(--heading);">プライバシーポリシー</a>に同意します（未成年の場合は保護者の同意を得ています）
                     </label>
                 </div>
 
@@ -825,10 +851,10 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <img id="myProfileIcon" src=""
-                        style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid #66BB6A;"
+                        style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid var(--accent);"
                         onclick="openProfileModal()">
                     <p
-                        style="font-size:11px; color:#5D4037; margin:0; font-weight:bold; background:#EAE5D9; padding:4px 12px; border-radius:15px; letter-spacing: 1px;">
+                        style="font-size:11px; color:var(--text-sub); margin:0; font-weight:bold; background:var(--border); padding:4px 12px; border-radius:15px; letter-spacing: 1px;">
                         ID: <span id="displayUserId">---</span>
                     </p>
                 </div>
@@ -839,12 +865,12 @@
             </div>
 
             <div id="warningBanner"
-                style="display: none; background: #FFEBEE; border: 2px solid #E53935; color: #C62828; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(229,57,53,0.15);">
+                style="display: none; background: #FFEBEE; border: 2px solid var(--warn); color: #C62828; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(229,57,53,0.15);">
             </div>
 
             <div id="countdownBox" class="card"
-                style="text-align: center; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); display: none;">
-                <div style="font-size: 14px; color: #1565C0; font-weight: bold;">目標の期日まで</div>
+                style="text-align: center; background: linear-gradient(135deg, var(--info-bg) 0%, var(--info-bg2) 100%); display: none;">
+                <div style="font-size: 14px; color: var(--info-text); font-weight: bold;">目標の期日まで</div>
                 <div id="daysLeft" style="font-size: 36px; font-weight: bold; color: #0D47A1; margin: 5px 0;">あと -- 日
                 </div>
                 <div id="goalDateText" style="font-size: 12px; color: #1976D2;"></div>
@@ -868,27 +894,27 @@
                         <span style="font-size:14px; color:var(--text);">ダークモード</span>
                         <label style="position:relative; display:inline-block; width:50px; height:28px; cursor:pointer;">
                             <input type="checkbox" id="darkToggle" onchange="toggleDarkMode()" style="opacity:0; width:0; height:0;">
-                            <span id="darkSlider" style="position:absolute; top:0; left:0; right:0; bottom:0; background:#CAC1AC; border-radius:28px; transition:0.3s;"></span>
+                            <span id="darkSlider" style="position:absolute; top:0; left:0; right:0; bottom:0; background:var(--muted); border-radius:28px; transition:0.3s;"></span>
                             <span id="darkKnob" style="position:absolute; height:22px; width:22px; left:3px; top:3px; background:#fff; border-radius:50%; transition:0.3s;"></span>
                         </label>
                     </div>
                     <button onclick="openProfileModal()">プロフィール（名前・画像）</button>
                     <button onclick="openGoalModal()">目標・期日の変更</button>
                     <button onclick="logout()"
-                        style="background: #CAC1AC; box-shadow: none;">ログアウト</button>
+                        style="background: var(--muted); box-shadow: none;">ログアウト</button>
                 </div>
                 <div class="card">
                     <h3 style="margin-top:0; font-size:15px; display:flex; align-items:center; gap:8px;"><svg width="17" height="17" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M11.68 2.009A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673c-.824-.85-1.678-1.731-2.21-3.348"/><circle cx="18" cy="5" r="3"/></svg>通知</h3>
-                    <p style="font-size:12px; color:#7A6F5D; margin:0;">
+                    <p style="font-size:12px; color:var(--text-sub2); margin:0;">
                         その日まだ学習していないとき、22時にお知らせします。</p>
-                    <p id="pushStatus" style="font-size:11px; color:#8D6E63; margin:6px 0 0 0;"></p>
+                    <p id="pushStatus" style="font-size:11px; color:var(--text-sub); margin:6px 0 0 0;"></p>
                     <button id="pushEnableBtn" onclick="enablePush()">学習リマインダーを受け取る</button>
                     <button id="pushDisableBtn" onclick="disablePush()"
-                        style="background: #CAC1AC; box-shadow: none; display: none;">通知を停止する</button>
+                        style="background: var(--muted); box-shadow: none; display: none;">通知を停止する</button>
                 </div>
                 <div class="card">
                     <h3 style="margin-top:0; font-size:15px;">このアプリについて</h3>
-                    <p style="font-size:12px; color:#7A6F5D; line-height:1.8; margin:0 0 12px 0;">
+                    <p style="font-size:12px; color:var(--text-sub2); line-height:1.8; margin:0 0 12px 0;">
                         ご意見・ご感想・不具合のご報告は、開発者まで気軽にお寄せください。
                         いただいた声は、今後の改善に役立てます。</p>
                     <a href="mailto:ohgy.dev@gmail.com?subject=みんスタへのご意見"
@@ -896,35 +922,35 @@
                         ご意見・お問い合わせ</a>
                     <p style="font-size:11px; color:#A99F8C; text-align:center; margin:0 0 18px 0;">
                         ohgy.dev@gmail.com</p>
-                    <p style="font-size:12px; color:#7A6F5D; line-height:1.8; margin:0 0 12px 0;">
+                    <p style="font-size:12px; color:var(--text-sub2); line-height:1.8; margin:0 0 12px 0;">
                         みんスタは個人で開発・運営しています。応援いただける方は、こちらから支援できます。
                         いただいた支援は、みんスタの運営・開発に充てさせていただきます。</p>
                     <a href="https://ofuse.me/467b7906" target="_blank" rel="noopener noreferrer"
-                        style="display:block; text-align:center; text-decoration:none; background:linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%); color:#fff; border-radius:30px; padding:12px; font-size:14px; font-weight:bold; box-shadow:0 5px 15px rgba(76,175,80,0.4);">
+                        style="display:block; text-align:center; text-decoration:none; background:linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); color:#fff; border-radius:30px; padding:12px; font-size:14px; font-weight:bold; box-shadow:0 5px 15px rgba(76,175,80,0.4);">
                         開発を応援する</a>
                 </div>
             </div>
 
-            <div id="groupArea" class="card" style="display: none; background: #E8F5E9; border: 1px solid #C8E6C9;">
-                <h3 style="margin-top: 0; font-size: 14px; color: #2E7D32;">👥 今のチームメイト <span id="syncStatus"
-                        style="font-size:10px; color:#66BB6A; font-weight:normal;">(リアルタイム同期中🟢)</span></h3>
+            <div id="groupArea" class="card" style="display: none; background: var(--soft); border: 1px solid var(--soft-border);">
+                <h3 style="margin-top: 0; font-size: 14px; color: var(--heading);">👥 今のチームメイト <span id="syncStatus"
+                        style="font-size:10px; color:var(--accent); font-weight:normal;">(リアルタイム同期中🟢)</span></h3>
                 <div id="groupMembers" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px;"></div>
 
-                <div id="teamForestBox" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #C8E6C9;">
-                    <div style="font-size: 13px; font-weight: bold; color: #2E7D32;">🌲 チームで育てている森</div>
+                <div id="teamForestBox" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--soft-border);">
+                    <div style="font-size: 13px; font-weight: bold; color: var(--heading);">🌲 チームで育てている森</div>
                     <div id="teamForestVisual" class="forest-visual">🌱</div>
-                    <div id="teamForestText" style="font-size: 11px; color: #66BB6A;">チーム合計: 0 分</div>
+                    <div id="teamForestText" style="font-size: 11px; color: var(--accent);">チーム合計: 0 分</div>
                 </div>
             </div>
 
             <!-- キック・卒業でチームを離れた人が、再びチームに参加するためのカード -->
-            <div id="joinGroupArea" class="card" style="display: none; text-align: center; background: #E8F5E9; border: 1px solid #C8E6C9;">
-                <div style="font-size: 15px; font-weight: bold; color: #2E7D32; margin-bottom: 8px;">今はどのチームにも所属していません</div>
-                <div style="font-size: 12px; color: #66BB6A; line-height: 1.7; margin-bottom: 14px;">
+            <div id="joinGroupArea" class="card" style="display: none; text-align: center; background: var(--soft); border: 1px solid var(--soft-border);">
+                <div style="font-size: 15px; font-weight: bold; color: var(--heading); margin-bottom: 8px;">今はどのチームにも所属していません</div>
+                <div style="font-size: 12px; color: var(--accent); line-height: 1.7; margin-bottom: 14px;">
                     同じ目標の仲間と、もう一度3人で並走しませんか。<br>あなたのペースで、いつでも始められます。
                 </div>
                 <button id="joinGroupBtn" onclick="joinGroup()"
-                    style="background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%); color: #fff; border: none; border-radius: 30px; padding: 14px 32px; font-size: 15px; font-weight: bold; box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);">
+                    style="background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); color: #fff; border: none; border-radius: 30px; padding: 14px 32px; font-size: 15px; font-weight: bold; box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);">
                     チームに参加する
                 </button>
             </div>
@@ -941,7 +967,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0; font-size: 14px;">📚 わたしの本棚（25分/マス）</h3>
                     <button onclick="openBookModal()"
-                        style="width: auto; padding: 6px 12px; margin: 0; font-size: 10px; background: #8D6E63; box-shadow: none;">＋
+                        style="width: auto; padding: 6px 12px; margin: 0; font-size: 10px; background: var(--text-sub); box-shadow: none;">＋
                         追加</button>
                 </div>
 
@@ -950,19 +976,19 @@
                 </div>
 
                 <p
-                    style="font-size:11px; margin-top:15px; color:#8D6E63; margin-bottom:5px; border-top: 1px dashed #EAE5D9; padding-top: 10px;">
+                    style="font-size:11px; margin-top:15px; color:var(--text-sub); margin-bottom:5px; border-top: 1px dashed var(--border); padding-top: 10px;">
                     🔍 ネットから本を検索して追加</p>
                 <div style="display: flex; gap: 5px;">
                     <input type="text" id="bookSearchInput" placeholder="キーワードを入力" style="padding: 8px;">
                     <button onclick="searchBooks()"
-                        style="width: 70px; margin-top: 8px; padding: 8px; background:#CAC1AC; color:#3E2723;">検索</button>
+                        style="width: 70px; margin-top: 8px; padding: 8px; background:var(--muted); color:var(--text);">検索</button>
                 </div>
                 <div id="bookResults" class="book-search-container"></div>
             </div>
 
             <div class="card">
                 <h3 style="margin-top: 0; font-size: 14px;">🌱 今日の種<span
-                        style="font-size: 10px; color: #8D6E63; font-weight: normal;">（今日やることの小さな宣言・3つまで）</span></h3>
+                        style="font-size: 10px; color: var(--text-sub); font-weight: normal;">（今日やることの小さな宣言・3つまで）</span></h3>
                 <div id="seedTodayList"></div>
                 <div id="seedTodayAdd" style="display: flex; gap: 6px; margin-top: 6px;">
                     <input type="text" id="seedTodayInput" maxlength="50" placeholder="今日やることを1つ"
@@ -970,9 +996,9 @@
                     <button onclick="addSeed('today')"
                         style="width: auto; padding: 8px 16px; margin: 0; font-size: 12px;">まく</button>
                 </div>
-                <div style="margin-top: 10px; border-top: 1px dashed #EAE5D9; padding-top: 8px;">
+                <div style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px;">
                     <div onclick="toggleTomorrowSeeds()"
-                        style="font-size: 12px; color: #8D6E63; cursor: pointer; font-weight: bold;">
+                        style="font-size: 12px; color: var(--text-sub); cursor: pointer; font-weight: bold;">
                         <span id="seedTomorrowArrow">▶</span> 明日の種をまいておく<span
                             style="font-weight: normal; font-size: 10px;">（朝、自動で今日の種になります）</span>
                     </div>
@@ -990,25 +1016,25 @@
 
             <div class="card">
                 <h3 style="margin-top: 0;">⏱️ 学習タイマー</h3>
-                <select id="activeBookSelect" style="margin-bottom: 15px; font-weight:bold; color:#5D4037;">
+                <select id="activeBookSelect" style="margin-bottom: 15px; font-weight:bold; color:var(--text-sub);">
                     <option value="">▼ 記録する参考書を選択 (任意)</option>
                 </select>
                 <div class="timer-display" id="display">00:00:00</div>
 
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button onclick="startTimer()" id="startBtn" style="background:#66BB6A;">START (通常)</button>
+                    <button onclick="startTimer()" id="startBtn" style="background:var(--accent);">START (通常)</button>
                     <button onclick="startPomodoro()" id="pomoBtn" class="pomodoro-btn">25分 集中</button>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button onclick="togglePause()" id="pauseBtn" style="background:#FFCA28; color:#3E2723;" disabled>一時停止</button>
-                    <button onclick="stopTimer()" id="stopBtn" style="background:#EF5350;" disabled>終了して記録</button>
+                    <button onclick="togglePause()" id="pauseBtn" style="background:var(--amber); color:var(--text);" disabled>一時停止</button>
+                    <button onclick="stopTimer()" id="stopBtn" style="background:var(--warn-soft);" disabled>終了して記録</button>
                 </div>
 
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #EAE5D9; text-align: center;">
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); text-align: center;">
                     <label
-                        style="font-size: 12px; font-weight: bold; color: #5D4037; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px;"><svg width="15" height="15" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>集中を深める環境音</label>
+                        style="font-size: 12px; font-weight: bold; color: var(--text-sub); display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px;"><svg width="15" height="15" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>集中を深める環境音</label>
                     <select id="bgmSelect" onchange="handleSoundChange()"
-                        style="font-weight: bold; color: #3E2723; background: #F3F0E8; border: none; box-shadow: none;">
+                        style="font-weight: bold; color: var(--text); background: var(--border-soft); border: none; box-shadow: none;">
                         <option value="none">🔇 無音 (OFF)</option>
                         <option value="forest">🍃 森の鳥たち</option>
                         <option value="fire">🔥 焚き火</option>
@@ -1027,20 +1053,20 @@
             </div>
 
             <div class="card"
-                style="background: linear-gradient(135deg, #F1F8E9 0%, #E8F5E9 100%); border: 1px solid #C8E6C9;">
-                <h3 style="margin-top: 0; font-size: 14px; color: #2E7D32;">今週の学習サマリー</h3>
+                style="background: linear-gradient(135deg, #F1F8E9 0%, var(--soft) 100%); border: 1px solid var(--soft-border);">
+                <h3 style="margin-top: 0; font-size: 14px; color: var(--heading);">今週の学習サマリー</h3>
                 <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 8px;">
                     <div>
-                        <div id="weeklyMinutes" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
-                        <div style="font-size: 10px; color: #8D6E63;">分（直近7日）</div>
+                        <div id="weeklyMinutes" style="font-size: 24px; font-weight: bold; color: var(--heading);">0</div>
+                        <div style="font-size: 10px; color: var(--text-sub);">分（直近7日）</div>
                     </div>
                     <div>
-                        <div id="weeklyDays" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
-                        <div style="font-size: 10px; color: #8D6E63;">日 学習した</div>
+                        <div id="weeklyDays" style="font-size: 24px; font-weight: bold; color: var(--heading);">0</div>
+                        <div style="font-size: 10px; color: var(--text-sub);">日 学習した</div>
                     </div>
                     <div>
-                        <div id="weeklyPomodoro" style="font-size: 24px; font-weight: bold; color: #2E7D32;">0</div>
-                        <div style="font-size: 10px; color: #8D6E63;">マス</div>
+                        <div id="weeklyPomodoro" style="font-size: 24px; font-weight: bold; color: var(--heading);">0</div>
+                        <div style="font-size: 10px; color: var(--text-sub);">マス</div>
                     </div>
                 </div>
             </div>
@@ -1059,7 +1085,7 @@
 
             <div class="card">
                 <h3 style="margin-top: 0; font-size: 14px;">📖 自分の学習履歴</h3>
-                <div id="historyList" class="history-area" style="font-size: 12px; color: #5D4037;">
+                <div id="historyList" class="history-area" style="font-size: 12px; color: var(--text-sub);">
                     <p style="text-align:center; color:#888;">まだ学習記録がありません。</p>
                 </div>
             </div>
@@ -1098,14 +1124,14 @@
         <div class="modal-content" style="max-width:340px; text-align:center; padding:28px 24px;">
             <div id="onboardStep1" class="onboard-step">
                 <div style="font-size:54px; line-height:1;">🌱</div>
-                <h2 style="font-size:20px; margin:14px 0 6px; color:#2E7D32;">みんスタへようこそ！</h2>
-                <p style="font-size:14px; color:#5D4037; line-height:1.7; margin:0;">
+                <h2 style="font-size:20px; margin:14px 0 6px; color:var(--heading);">みんスタへようこそ！</h2>
+                <p style="font-size:14px; color:var(--text-sub); line-height:1.7; margin:0;">
                     みんスタは、同じ目標の仲間と少人数チームで、毎日の学習を記録しながら森を育てるアプリです。まずは使い方を30秒だけ見てみましょう。</p>
             </div>
             <div id="onboardStep2" class="onboard-step" style="display:none;">
                 <div style="font-size:46px; line-height:1;">📚 ⏱️ 🌳</div>
-                <h2 style="font-size:18px; margin:14px 0 10px; color:#2E7D32;">3ステップだけ</h2>
-                <div style="text-align:left; font-size:14px; color:#5D4037; line-height:2;">
+                <h2 style="font-size:18px; margin:14px 0 10px; color:var(--heading);">3ステップだけ</h2>
+                <div style="text-align:left; font-size:14px; color:var(--text-sub); line-height:2;">
                     <div><b>① 本を選ぶ</b>…使っている参考書を本棚に登録</div>
                     <div><b>② タイマーで勉強</b>…集中して学習</div>
                     <div><b>③ 記録する</b>…報告すると、チームの森が育ちます</div>
@@ -1113,8 +1139,8 @@
             </div>
             <div id="onboardStep3" class="onboard-step" style="display:none;">
                 <div style="font-size:54px; line-height:1;">✍️</div>
-                <h2 style="font-size:20px; margin:14px 0 6px; color:#2E7D32;">さっそく、最初の1歩を</h2>
-                <p style="font-size:14px; color:#5D4037; line-height:1.7; margin:0;">
+                <h2 style="font-size:20px; margin:14px 0 6px; color:var(--heading);">さっそく、最初の1歩を</h2>
+                <p style="font-size:14px; color:var(--text-sub); line-height:1.7; margin:0;">
                     今日やった学習を、1つ記録してみましょう。小さな1回が、あなたの森の最初の芽になります。</p>
             </div>
 
@@ -1125,19 +1151,19 @@
             </div>
 
             <button id="onboardNext" onclick="onboardNext()" style="width:100%; margin:0;">つぎへ</button>
-            <p onclick="closeOnboard()" style="font-size:12px; color:#8D6E63; cursor:pointer; margin:12px 0 0;">スキップ</p>
+            <p onclick="closeOnboard()" style="font-size:12px; color:var(--text-sub); cursor:pointer; margin:12px 0 0;">スキップ</p>
         </div>
     </div>
 
     <div id="memberDetailModal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <div id="memberDetailIcon" style="display:flex; justify-content:center; align-items:center; height:80px; margin-bottom:10px;"></div>
-            <h3 id="memberDetailName" style="margin:0 0 4px 0; color:#3E2723;"></h3>
+            <h3 id="memberDetailName" style="margin:0 0 4px 0; color:var(--text);"></h3>
             <div id="memberDetailMinutes" style="font-size:12px; color:#888; margin-bottom:16px;"></div>
             <div id="memberDetailBadges" style="display:flex; flex-wrap:wrap; justify-content:center; gap:14px; margin-bottom:8px;"></div>
             <div id="memberDetailNoBadge" style="font-size:12px; color:#aaa; display:none;">まだ称号はありません</div>
             <button onclick="document.getElementById('memberDetailModal').style.display='none'"
-                style="background:#CAC1AC; margin-top:18px;">閉じる</button>
+                style="background:var(--muted); margin-top:18px;">閉じる</button>
         </div>
     </div>
 
@@ -1145,22 +1171,22 @@
         <div class="modal-content">
             <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><svg width="20" height="20" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>プロフィールの設定</h3>
             <div style="margin-bottom: 20px;">
-                <label style="display:block; font-size:13px; color:#7A6F5D; margin-bottom:6px;">ニックネーム</label>
+                <label style="display:block; font-size:13px; color:var(--text-sub2); margin-bottom:6px;">ニックネーム</label>
                 <input type="text" id="nameInput" maxlength="20" placeholder="ニックネーム"
-                    style="width:100%; padding:10px; box-sizing:border-box; border:1px solid #EAE5D9; border-radius:8px; font-size:14px;">
-                <button onclick="saveName()" style="background: #4CAF50; margin-top:10px; width:100%;">ニックネームを保存</button>
+                    style="width:100%; padding:10px; box-sizing:border-box; border:1px solid var(--border); border-radius:8px; font-size:14px;">
+                <button onclick="saveName()" style="background: var(--accent-strong); margin-top:10px; width:100%;">ニックネームを保存</button>
             </div>
-            <hr style="border:none; border-top:1px solid #EAE5D9; margin:16px 0;">
+            <hr style="border:none; border-top:1px solid var(--border); margin:16px 0;">
             <h3 style="margin-top:0; font-size:15px; display:flex; align-items:center; gap:8px;"><svg width="17" height="17" style="flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>プロフィール画像の設定</h3>
             <input type="file" id="profileImageInput" accept="image/*" onchange="previewProfileImage(event)"
                 style="font-size: 12px;">
             <div style="text-align:center; margin-top:10px;">
                 <img id="profilePreview" src=""
-                    style="width:100px; height:100px; object-fit:cover; border-radius:50%; border: 3px solid #EAE5D9;">
+                    style="width:100px; height:100px; object-fit:cover; border-radius:50%; border: 3px solid var(--border);">
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button onclick="closeProfileModal()" style="background: #CAC1AC; margin-top:0;">閉じる</button>
-                <button onclick="saveProfileImage()" style="background: #4CAF50; margin-top:0;">画像を保存</button>
+                <button onclick="closeProfileModal()" style="background: var(--muted); margin-top:0;">閉じる</button>
+                <button onclick="saveProfileImage()" style="background: var(--accent-strong); margin-top:0;">画像を保存</button>
             </div>
         </div>
     </div>
@@ -1168,18 +1194,18 @@
     <div id="goalModal" class="modal">
         <div class="modal-content">
             <h3 id="goalModalTitle" style="margin-top:0;">目標の変更</h3>
-            <p id="goalModalNote" style="font-size:11px; color:#E53935; font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
+            <p id="goalModalNote" style="font-size:11px; color:var(--warn); font-weight:bold;">※目標を変更すると、今のチームを卒業します。</p>
             <input type="text" id="editGoal" placeholder="🔍 新しい目標を入力・検索"
                 oninput="filterTagsIn('editGoal', 'editTagsContainer')">
             <div class="goal-tags-container" id="editTagsContainer" style="max-height:220px;"></div>
-            <label style="font-size: 11px; color: #8D6E63; display: block; margin: 10px 0 2px 5px;">📅 新しい期日</label>
-            <input type="date" id="editDate" style="color: #5D4037;">
+            <label style="font-size: 11px; color: var(--text-sub); display: block; margin: 10px 0 2px 5px;">📅 新しい期日</label>
+            <input type="date" id="editDate" style="color: var(--text-sub);">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button onclick="closeGoalModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
-                <button onclick="updateGoal()" style="background: #4CAF50; margin-top:0;">変更する</button>
+                <button onclick="closeGoalModal()" style="background: var(--muted); margin-top:0;">キャンセル</button>
+                <button onclick="updateGoal()" style="background: var(--accent-strong); margin-top:0;">変更する</button>
             </div>
-            <div id="goalAchieveArea" style="margin-top:16px; padding-top:14px; border-top:1px solid #EAE5D9;">
-                <p style="font-size:11px; color:#8D6E63; margin:0 0 8px 0;">目標を達成しましたか？</p>
+            <div id="goalAchieveArea" style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
+                <p style="font-size:11px; color:var(--text-sub); margin:0 0 8px 0;">目標を達成しましたか？</p>
                 <button onclick="closeGoalModal(); confirmGraduate();"
                     style="background: linear-gradient(135deg, #f0a8c4, #e58aae); margin-top:0;">🌸 目標を達成した（巣立つ）</button>
             </div>
@@ -1189,14 +1215,14 @@
     <div id="bookModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-top:0;">📚 参考書を本棚に追加</h3>
-            <label style="font-size: 12px; color: #5D4037;">1. タイトル</label>
+            <label style="font-size: 12px; color: var(--text-sub);">1. タイトル</label>
             <input type="text" id="newBookTitle" placeholder="例: 徹底攻略 Python">
-            <label style="font-size: 12px; color: #5D4037; margin-top:10px; display:block;">2. マスと芝生の色</label>
+            <label style="font-size: 12px; color: var(--text-sub); margin-top:10px; display:block;">2. マスと芝生の色</label>
             <div style="display:flex; align-items:center; gap:10px;">
-                <input type="color" id="newBookColor" value="#66BB6A" style="width: 50px; height: 40px; padding: 2px;">
-                <span style="font-size:11px; color:#8D6E63;">この本の色になります</span>
+                <input type="color" id="newBookColor" value="var(--accent)" style="width: 50px; height: 40px; padding: 2px;">
+                <span style="font-size:11px; color:var(--text-sub);">この本の色になります</span>
             </div>
-            <label style="font-size: 12px; color: #5D4037; margin-top:15px; display:block;">3. 表紙画像（任意）</label>
+            <label style="font-size: 12px; color: var(--text-sub); margin-top:15px; display:block;">3. 表紙画像（任意）</label>
             <input type="file" id="newBookImage" accept="image/*" onchange="previewImage(event)"
                 style="font-size: 12px;">
             <div style="text-align:center; margin-top:10px;">
@@ -1205,41 +1231,41 @@
                     style="width:80px; height:110px; object-fit:cover; border-radius:8px;">
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button onclick="closeBookModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
-                <button onclick="saveBook()" style="background: #4CAF50; margin-top:0;">本棚に追加</button>
+                <button onclick="closeBookModal()" style="background: var(--muted); margin-top:0;">キャンセル</button>
+                <button onclick="saveBook()" style="background: var(--accent-strong); margin-top:0;">本棚に追加</button>
             </div>
         </div>
     </div>
 
     <div id="editBookModal" class="modal">
         <div class="modal-content">
-            <h3 id="editBookModalTitle" style="margin-top:0; font-size:15px; color:#3E2723;">⚙️ 本の編集</h3>
+            <h3 id="editBookModalTitle" style="margin-top:0; font-size:15px; color:var(--text);">⚙️ 本の編集</h3>
 
-            <label style="font-size: 12px; color: #5D4037; margin-top:15px; display:block; text-align:left;">🎨
+            <label style="font-size: 12px; color: var(--text-sub); margin-top:15px; display:block; text-align:left;">🎨
                 芝生とマスの色を変更</label>
             <div style="display:flex; align-items:center; gap:15px; margin-top:5px;">
                 <input type="color" id="editBookColor" style="width: 60px; height: 40px; padding: 2px; cursor:pointer;">
-                <span style="font-size:11px; color:#8D6E63;">クリックして新しい色を選択</span>
+                <span style="font-size:11px; color:var(--text-sub);">クリックして新しい色を選択</span>
             </div>
 
-            <label style="font-size: 12px; color: #5D4037; margin-top:15px; display:block; text-align:left;">🖼️
+            <label style="font-size: 12px; color: var(--text-sub); margin-top:15px; display:block; text-align:left;">🖼️
                 表紙画像を変更</label>
             <input type="file" id="editBookImage" accept="image/*" onchange="previewEditImage(event)"
                 style="font-size: 12px;">
             <div style="text-align:center; margin-top:10px;">
                 <img id="editBookPreview" src=""
-                    style="width:80px; height:110px; object-fit:cover; border-radius:8px; border: 2px solid #EAE5D9;">
+                    style="width:80px; height:110px; object-fit:cover; border-radius:8px; border: 2px solid var(--border);">
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 25px;">
-                <button onclick="closeEditBookModal()" style="background: #CAC1AC; margin-top:0;">キャンセル</button>
-                <button onclick="saveEditBook()" style="background: #4CAF50; margin-top:0;">変更を保存</button>
+                <button onclick="closeEditBookModal()" style="background: var(--muted); margin-top:0;">キャンセル</button>
+                <button onclick="saveEditBook()" style="background: var(--accent-strong); margin-top:0;">変更を保存</button>
             </div>
 
-            <hr style="border:0; border-top:1px dashed #EAE5D9; margin:20px 0;">
+            <hr style="border:0; border-top:1px dashed var(--border); margin:20px 0;">
 
             <button onclick="deleteBook()"
-                style="background: #EF5350; margin-top:0; font-size:12px; padding:10px; box-shadow: 0 4px 10px rgba(239,83,80,0.25);">⚠️
+                style="background: var(--warn-soft); margin-top:0; font-size:12px; padding:10px; box-shadow: 0 4px 10px rgba(239,83,80,0.25);">⚠️
                 この書物を本棚から削除する</button>
         </div>
     </div>
@@ -1353,7 +1379,7 @@
         // 改良（セキュリティ）: インラインstyleへ差し込む色は #rrggbb 形式のみ許可する。
         // 想定外の値が来ても CSS が壊れたり注入されたりしないようにする。
         function safeColor(value, fallback) {
-            const fb = fallback || '#66BB6A';
+            const fb = fallback || 'var(--accent)';
             return (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) ? value : fb;
         }
 
@@ -1493,7 +1519,7 @@
             cancelBreak();
             breakEndTime = Date.now() + BREAK_MINUTES * 60 * 1000;
             const display = document.getElementById('display');
-            display.style.color = '#1565C0';
+            display.style.color = 'var(--info-text)';
             breakTimerObj = setInterval(() => {
                 const remain = Math.round((breakEndTime - Date.now()) / 1000);
                 if (remain <= 0) {
@@ -1511,7 +1537,7 @@
 
         function cancelBreak() {
             if (breakTimerObj) { clearInterval(breakTimerObj); breakTimerObj = null; }
-            document.getElementById('display').style.color = '#3E2723';
+            document.getElementById('display').style.color = 'var(--text)';
         }
 
         let timerObj = null;
@@ -1931,8 +1957,8 @@
             const el = document.getElementById(inputId);
             el.value = text.replace('#', '');
             filterTagsIn(inputId, containerId);
-            el.style.backgroundColor = "#E8F5E9";
-            setTimeout(() => el.style.backgroundColor = "#FFFEF8", 300);
+            el.style.backgroundColor = "var(--soft)";
+            setTimeout(() => el.style.backgroundColor = "var(--card)", 300);
         }
 
         function setGoal(text) { setGoalFor('regGoal', 'tagsContainer', text); }
@@ -2125,7 +2151,7 @@
                     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     // 一瞬だけ枠を光らせて「ここだよ」と示す
                     card.style.transition = 'box-shadow .3s';
-                    card.style.boxShadow = '0 0 0 3px #66BB6A';
+                    card.style.boxShadow = '0 0 0 3px var(--accent)';
                     setTimeout(() => { card.style.boxShadow = ''; }, 1600);
                 }
             }
@@ -2163,9 +2189,9 @@
                         <div style="display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px dashed #F0EDE3;">
                             <span onclick="${!s.achieved && kind === 'today' ? `achieveSeed(${s.id})` : ''}"
                                 style="cursor:${!s.achieved && kind === 'today' ? 'pointer' : 'default'}; font-size:16px;">${s.achieved ? '🌱' : '⬜'}</span>
-                            <span style="flex:1; font-size:13px; ${s.achieved ? 'text-decoration:line-through; color:#9CCC9C;' : 'color:#5D4037;'}">${escapeHtml(s.content)}</span>
+                            <span style="flex:1; font-size:13px; ${s.achieved ? 'text-decoration:line-through; color:#9CCC9C;' : 'color:var(--text-sub);'}">${escapeHtml(s.content)}</span>
                             <span onclick="deleteSeed(${s.id})"
-                                style="cursor:pointer; color:#CAC1AC; padding:0 4px; display:inline-flex; align-items:center;"><svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+                                style="cursor:pointer; color:var(--muted); padding:0 4px; display:inline-flex; align-items:center;"><svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
                         </div>`).join('');
                 }
                 const addEl = document.getElementById(addId);
@@ -2739,14 +2765,14 @@
                         resultsDiv.innerHTML += `
                         <div class="book-item-small" data-action="add-searched-book" data-title="${escapeHtml(rawTitle)}" data-thumb="${escapeHtml(thumb)}">
                             <img src="${escapeHtml(thumb)}" class="book-img-small">
-                            <div style="font-size: 10px; line-height: 1.2; margin-top: 4px; color: #5D4037; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(rawTitle)}</div>
+                            <div style="font-size: 10px; line-height: 1.2; margin-top: 4px; color: var(--text-sub); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(rawTitle)}</div>
                         </div>`;
                     });
 
                     resultsDiv.innerHTML += `
-                    <div id="loadMoreBooksBtn" class="book-item-small" data-action="load-more-books" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: #EAE5D9; border-radius: 8px; height: 110px; border: 2px dashed #CAC1AC; cursor: pointer; min-width: 80px;">
-                        <div style="font-size: 24px; color: #8D6E63;">＋</div>
-                        <div style="font-size: 11px; font-weight: bold; color: #5D4037; margin-top: 4px;">もっと見る</div>
+                    <div id="loadMoreBooksBtn" class="book-item-small" data-action="load-more-books" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--border); border-radius: 8px; height: 110px; border: 2px dashed var(--muted); cursor: pointer; min-width: 80px;">
+                        <div style="font-size: 24px; color: var(--text-sub);">＋</div>
+                        <div style="font-size: 11px; font-weight: bold; color: var(--text-sub); margin-top: 4px;">もっと見る</div>
                     </div>`;
 
                 } else {
@@ -2758,14 +2784,14 @@
                 }
             } catch (error) {
                 if (!isLoadMore) {
-                    resultsDiv.innerHTML = `<p style="font-size:11px; color:#E53935; font-weight:bold;">⚠️ ${error.message || '通信エラーが発生しました'}</p>`;
+                    resultsDiv.innerHTML = `<p style="font-size:11px; color:var(--warn); font-weight:bold;">⚠️ ${error.message || '通信エラーが発生しました'}</p>`;
                 } else {
                     alert(error.message || "続きの取得に失敗しました");
                 }
             } finally {
                 if (!isLoadMore) {
                     searchBtn.disabled = false;
-                    searchBtn.style.background = "#CAC1AC";
+                    searchBtn.style.background = "var(--muted)";
                     searchBtn.innerText = "検索";
                 }
             }
@@ -2944,8 +2970,8 @@
 
         function prepareTimerUI() {
             document.getElementById('pauseBtn').innerText = "一時停止";
-            document.getElementById('pauseBtn').style.background = "#FFCA28";
-            document.getElementById('pauseBtn').style.color = "#3E2723";
+            document.getElementById('pauseBtn').style.background = "var(--amber)";
+            document.getElementById('pauseBtn').style.color = "var(--text)";
             document.getElementById('startBtn').disabled = true; document.getElementById('pomoBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false; document.getElementById('pauseBtn').disabled = false;
 
@@ -2961,14 +2987,14 @@
                 accumulatedSeconds += Math.floor((now - timerStartTime) / 1000);
 
                 const btn = document.getElementById('pauseBtn');
-                btn.innerText = "再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
+                btn.innerText = "再開する"; btn.style.background = "var(--accent)"; btn.style.color = "white";
                 isPaused = true;
             } else {
                 playCurrentBGM();
                 timerStartTime = Date.now();
 
                 const btn = document.getElementById('pauseBtn');
-                btn.innerText = "一時停止"; btn.style.background = "#FFCA28"; btn.style.color = "#3E2723";
+                btn.innerText = "一時停止"; btn.style.background = "var(--amber)"; btn.style.color = "var(--text)";
                 isPaused = false;
                 timerObj = setInterval(timerTick, 500);
             }
@@ -2986,7 +3012,7 @@
             }
             document.getElementById('studyMinutes').value = mins;
             const btn = document.getElementById('pauseBtn');
-            btn.innerText = "再開する"; btn.style.background = "#66BB6A"; btn.style.color = "white";
+            btn.innerText = "再開する"; btn.style.background = "var(--accent)"; btn.style.color = "white";
             btn.disabled = false; isPaused = true;
             document.getElementById('startBtn').disabled = false; document.getElementById('pomoBtn').disabled = false; document.getElementById('stopBtn').disabled = true;
         }
@@ -3015,12 +3041,12 @@
             const toggle = document.getElementById('darkToggle');
             if (on) {
                 document.body.classList.add('dark');
-                if (slider) slider.style.background = '#66BB6A';
+                if (slider) slider.style.background = 'var(--accent)';
                 if (knob) knob.style.left = '25px';
                 if (toggle) toggle.checked = true;
             } else {
                 document.body.classList.remove('dark');
-                if (slider) slider.style.background = '#CAC1AC';
+                if (slider) slider.style.background = 'var(--muted)';
                 if (knob) knob.style.left = '3px';
                 if (toggle) toggle.checked = false;
             }
@@ -3175,14 +3201,14 @@
                 if (otherSum > 0) {
                     labels.push("その他");
                     data.push(otherSum);
-                    colors.push("#CAC1AC");
+                    colors.push("var(--muted)");
                 }
             }
 
             if (data.length === 0) {
                 labels.push("記録なし");
                 data.push(1);
-                colors.push("#F3F0E8");
+                colors.push("var(--border-soft)");
             }
 
             if (studyChartInstance) studyChartInstance.destroy();
@@ -3195,13 +3221,13 @@
                         data: data,
                         backgroundColor: colors,
                         borderWidth: 2,
-                        borderColor: '#FFFEF8'
+                        borderColor: getComputedStyle(document.body).getPropertyValue('--card').trim() || '#FFFEF8'
                     }]
                 },
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, color: '#5D4037' } }
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, color: 'var(--text-sub)' } }
                     },
                     cutout: '65%'
                 }
@@ -3214,7 +3240,7 @@
         }
 
         function getRandomColor() {
-            const colors = ['#EF5350', '#EC407A', '#AB47BC', '#7E57C2', '#5C6BC0', '#42A5F5', '#29B6F6', '#26C6DA', '#26A69A', '#66BB6A', '#9CCC65', '#D4E157', '#FFEE58', '#FFCA28', '#FFA726', '#FF7043'];
+            const colors = ['var(--warn-soft)', '#EC407A', '#AB47BC', '#7E57C2', '#5C6BC0', '#42A5F5', '#29B6F6', '#26C6DA', '#26A69A', 'var(--accent)', '#9CCC65', '#D4E157', '#FFEE58', 'var(--amber)', '#FFA726', '#FF7043'];
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
@@ -3296,10 +3322,10 @@
                         }
                         // 改良: 削除アイコンのクリックはイベント委譲で処理し、報告内容は
                         // エスケープして表示する（記録内容に記号が含まれても安全）。
-                        return `<div style="background:white; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid #EAE5D9; position:relative;">
+                        return `<div style="background:white; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid var(--border); position:relative;">
                         <div data-action="delete-report" data-report-id="${r.id}" style="position:absolute; top:8px; right:8px; cursor:pointer; opacity:0.6; transition:0.2s; display:flex; align-items:center;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="この記録を削除"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
                         <div style="font-size:10px; color:#888; margin-bottom:4px;">📅 ${dateStr}</div>
-                        <div style="line-height:1.4; padding-right:20px;">${bookLabel} ${escapeHtml(r.content)} <span style="font-weight:bold; color:#2E7D32;">(${r.study_minutes}分)</span></div>
+                        <div style="line-height:1.4; padding-right:20px;">${bookLabel} ${escapeHtml(r.content)} <span style="font-weight:bold; color:var(--heading);">(${r.study_minutes}分)</span></div>
                     </div>`;
                     }).join('');
                 }
@@ -3377,7 +3403,7 @@
                                 badges.map(b => `<img src="${BADGE_IMAGES[b]}" style="width:16px; height:16px;">`).join('') +
                                 `</div>`;
                         }
-                        return `<div onclick="openMemberDetail(${idx})" style="cursor:pointer; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"><div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:#3E2723; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div>${badgeHtml}</div>`;
+                        return `<div onclick="openMemberDetail(${idx})" style="cursor:pointer; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"><div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div>${badgeHtml}</div>`;
                     }).join('');
                 } catch (e) {
                     console.error('チームメンバーの取得に失敗しました:', e);
@@ -3448,7 +3474,7 @@
                         if (mins > maxMins) { maxMins = mins; dominantBookId = parseInt(bId); }
                     }
 
-                    let baseColor = "#66BB6A";
+                    let baseColor = "var(--accent)";
                     if (dominantBookId) {
                         const book = myBooks.find(b => b.id === dominantBookId);
                         if (book) baseColor = safeColor(book.color);
@@ -3462,7 +3488,7 @@
                     cell.style.backgroundColor = hexToRgba(baseColor, alpha);
                     cell.title = `${dateStr}: ${dayInfo.totalMins}分`;
                 } else {
-                    cell.style.backgroundColor = "#F3F0E8";
+                    cell.style.backgroundColor = "var(--border-soft)";
                     cell.title = `${dateStr}: 0分`;
                 }
                 container.appendChild(cell);

@@ -45,6 +45,7 @@
             --warn: #E53935;
             --warn-soft: #EF5350;
             --amber: #FFCA28;
+            --tabbar-bg: rgba(255, 253, 248, 0.97);
         }
         /* ===== ダークテーマ（温かみのある夜） ===== */
         body.dark {
@@ -72,6 +73,7 @@
             --warn: #E57373;
             --warn-soft: #C75C5C;
             --amber: #E0A93A;
+            --tabbar-bg: rgba(28, 24, 21, 0.97);
         }
         body {
             font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Quicksand', sans-serif;
@@ -533,7 +535,7 @@
             left: 0;
             right: 0;
             display: flex;
-            background: rgba(255, 253, 248, 0.97);
+            background: var(--tabbar-bg);
             border-top: 1px solid var(--border);
             z-index: 900;
             padding-bottom: env(safe-area-inset-bottom);

@@ -87,7 +87,7 @@
         .app-container {
             width: 100%;
             max-width: 400px;
-            background: #FFFBF0;
+            background: var(--card);
             min-height: 100vh;
             padding: 30px 20px;
             box-sizing: border-box;
@@ -100,7 +100,7 @@
             text-align: center;
             font-weight: bold;
             font-size: 28px;
-            color: #5D4037;
+            color: var(--text-sub);
             margin-bottom: 5px;
             letter-spacing: 2px;
         }
@@ -132,7 +132,7 @@
         }
 
         .toggle-link:hover {
-            color: #5D4037;
+            color: var(--text-sub);
         }
 
         .goal-tags-container {
@@ -140,9 +140,9 @@
             overflow-y: auto;
             padding: 5px;
             margin-bottom: 15px;
-            border: 1px dashed #CAC1AC;
+            border: 1px dashed var(--muted);
             border-radius: 10px;
-            background: #FFFDF8;
+            background: var(--card);
         }
 
         .goal-tags-container::-webkit-scrollbar {
@@ -150,7 +150,7 @@
         }
 
         .goal-tags-container::-webkit-scrollbar-thumb {
-            background: #CAC1AC;
+            background: var(--muted);
             border-radius: 10px;
         }
 
@@ -176,18 +176,18 @@
         }
 
         .goal-tag {
-            background: #E8F5E9;
+            background: var(--soft);
             color: var(--heading);
             padding: 5px 10px;
             border-radius: 20px;
             font-size: 11px;
             cursor: pointer;
-            border: 1px solid #C8E6C9;
+            border: 1px solid var(--soft-border);
             transition: 0.2s ease;
         }
 
         .goal-tag:hover {
-            background: #C8E6C9;
+            background: var(--soft-border);
             transform: scale(1.05);
         }
 
@@ -213,7 +213,7 @@
             width: 100%;
             aspect-ratio: 1;
             border-radius: 3px;
-            background-color: #F3F0E8;
+            background-color: var(--border-soft);
             transition: all 0.3s ease;
         }
 
@@ -232,7 +232,7 @@
         }
 
         .book-search-container::-webkit-scrollbar-thumb {
-            background: #CAC1AC;
+            background: var(--muted);
             border-radius: 10px;
         }
 
@@ -255,7 +255,7 @@
             object-fit: cover;
             border-radius: 8px;
             box-shadow: 4px 6px 15px rgba(0, 0, 0, 0.25);
-            background-color: #eee;
+            background-color: var(--border);
             border: 2px solid transparent;
         }
 
@@ -268,7 +268,7 @@
 
         .book-progress-card {
             display: flex;
-            background: #FFF;
+            background: var(--card-plain);
             padding: 12px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
@@ -336,8 +336,8 @@
         button {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
-            color: white;
+            background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+            color: var(--card-plain);
             border: none;
             border-radius: 30px;
             font-weight: bold;
@@ -348,7 +348,7 @@
         }
 
         button:disabled {
-            background: #D7CCC8;
+            background: var(--border);
             box-shadow: none;
             cursor: not-allowed;
         }
@@ -371,7 +371,7 @@
         .history-area {
             max-height: 200px;
             overflow-y: auto;
-            background: #F3F0E8;
+            background: var(--border-soft);
             border-radius: 15px;
             padding: 15px;
             box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -385,13 +385,13 @@
         }
 
         .msg-ai {
-            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
-            color: #1B5E20;
+            background: linear-gradient(135deg, var(--soft) 0%, var(--soft-border) 100%);
+            color: var(--heading);
         }
 
         .msg-user {
-            background: white;
-            border: 1px solid #D7CCC8;
+            background: var(--card-plain);
+            border: 1px solid var(--border);
         }
 
         .timer-display {
@@ -424,7 +424,7 @@
         }
 
         .modal-content {
-            background: #FFFBF0;
+            background: var(--card);
             width: 90%;
             max-width: 350px;
             padding: 20px;
@@ -446,7 +446,7 @@
             padding: 2px 9px;
             border-radius: 12px;
             background: var(--card);
-            border: 1px solid #E0DACE;
+            border: 1px solid var(--border);
             cursor: pointer;
             user-select: none;
             transition: transform 0.15s ease, background 0.15s ease;
@@ -458,8 +458,8 @@
         }
 
         .reaction-chip.mine {
-            background: #E8F5E9;
-            border-color: #66BB6A;
+            background: var(--soft);
+            border-color: var(--accent);
             font-weight: bold;
         }
 
@@ -483,21 +483,21 @@
         /* === 門出（卒業）演出オーバーレイ === */
         /* === 門出（卒業）演出オーバーレイ（軽量版：白い光・文字・花びらのみ） === */
         #monodeOverlay { position: fixed; inset: 0; z-index: 9999; display: none; }
-        #monodeOverlay .mn-scene { position: relative; width: 100%; height: 100%; max-width: 500px; margin: 0 auto; overflow: hidden; background: linear-gradient(to bottom, #fff6f8 0%, #fdeef2 55%, #f6e2ea 100%); }
+        #monodeOverlay .mn-scene { position: relative; width: 100%; height: 100%; max-width: 500px; margin: 0 auto; overflow: hidden; background: linear-gradient(to bottom, var(--card-plain)6f8 0%, #fdeef2 55%, #f6e2ea 100%); }
         /* 白い光（ふわっと包む） */
-        #monodeOverlay .mn-glow { position: absolute; top: 50%; left: 50%; width: 200vw; height: 200vw; transform: translate(-50%, -50%) scale(0.2); background: radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0.92) 28%, rgba(255,255,255,0) 62%); opacity: 0; z-index: 10; animation: mnGlow 3s ease-out forwards; }
+        #monodeOverlay .mn-glow { position: absolute; top: 50%; left: 50%; width: 200vw; height: 200vw; transform: translate(-50%, -50%) scale(0.2); background: radial-gradient(circle, var(--card-plain) 0%, rgba(255,255,255,0.92) 28%, rgba(255,255,255,0) 62%); opacity: 0; z-index: 10; animation: mnGlow 3s ease-out forwards; }
         @keyframes mnGlow { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); } 45% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.15); } }
         /* 花びら */
         #monodeOverlay .mn-petals { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 20; }
-        #monodeOverlay .mn-petal { position: absolute; top: -10vh; width: 10px; height: 16px; background: linear-gradient(135deg, #ffffff, #f5d6df); border-radius: 60% 0 60% 0; opacity: 0.8; animation: mnFall linear infinite; }
+        #monodeOverlay .mn-petal { position: absolute; top: -10vh; width: 10px; height: 16px; background: linear-gradient(135deg, var(--card-plain), #f5d6df); border-radius: 60% 0 60% 0; opacity: 0.8; animation: mnFall linear infinite; }
         @keyframes mnFall { 0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(var(--scale)); } 100% { transform: translate3d(-20px, 110vh, 0) rotate(360deg) scale(var(--scale)); } }
         /* メッセージ（白い光のあと、静かに浮かぶ） */
         #monodeOverlay .mn-message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -45%); width: 100%; text-align: center; opacity: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; animation: mnMsg 2s ease-out 2.4s forwards; }
         @keyframes mnMsg { 0% { opacity: 0; transform: translate(-50%, -42%); } 100% { opacity: 1; transform: translate(-50%, -50%); } }
-        #monodeOverlay .mn-main { font-family: 'Kaisei Decol', serif; font-size: 1.7rem; font-weight: 700; color: #54744c; letter-spacing: 0.15em; line-height: 1.6; }
-        #monodeOverlay .mn-sub { margin-top: 1.2rem; font-size: 0.85rem; color: #7a9070; line-height: 2; letter-spacing: 0.05em; }
-        #monodeOverlay .mn-seal { margin-top: 1.6rem; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #a6dca0, #6fb86a); display: grid; place-items: center; font-size: 26px; box-shadow: 0 8px 22px rgba(110,184,106,0.45); }
-        #monodeOverlay .mn-next { margin-top: 2rem; padding: 12px 40px; border: none; border-radius: 24px; background: linear-gradient(135deg, #f0a8c4, #e58aae); color: #fff; font-family: 'Zen Maru Gothic', sans-serif; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.1em; cursor: pointer; box-shadow: 0 6px 18px rgba(229,138,174,0.4); }
+        #monodeOverlay .mn-main { font-family: 'Kaisei Decol', serif; font-size: 1.7rem; font-weight: 700; color: var(--heading); letter-spacing: 0.15em; line-height: 1.6; }
+        #monodeOverlay .mn-sub { margin-top: 1.2rem; font-size: 0.85rem; color: var(--accent-light); line-height: 2; letter-spacing: 0.05em; }
+        #monodeOverlay .mn-seal { margin-top: 1.6rem; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-light), var(--accent)); display: grid; place-items: center; font-size: 26px; box-shadow: 0 8px 22px rgba(110,184,106,0.45); }
+        #monodeOverlay .mn-next { margin-top: 2rem; padding: 12px 40px; border: none; border-radius: 24px; background: linear-gradient(135deg, #f0a8c4, #e58aae); color: var(--card-plain); font-family: 'Zen Maru Gothic', sans-serif; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.1em; cursor: pointer; box-shadow: 0 6px 18px rgba(229,138,174,0.4); }
 
         /* タブバー: 画面下部の固定ナビ。タブページはJSで切り替える */
         .tab-page {
@@ -571,7 +571,7 @@
             left: 28%;
             right: 28%;
             height: 3px;
-            background: #66BB6A;
+            background: var(--accent);
             border-radius: 0 0 3px 3px;
         }
 
@@ -582,7 +582,7 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #E53935;
+            background: var(--warn);
             display: none;
         }
 
@@ -593,12 +593,12 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #D7CFC0;
+            background: var(--border);
             display: inline-block;
         }
 
         .onboard-dot.active {
-            background: #66BB6A;
+            background: var(--accent);
         }
         /* 報告成功トースト（ポンッと弾んで出て、すっと消える） */
         #reportToast {
@@ -606,8 +606,8 @@
             top: 38%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0.6);
-            background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
-            color: #fff;
+            background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+            color: var(--card-plain);
             font-size: 18px;
             font-weight: bold;
             padding: 16px 30px;
@@ -657,7 +657,7 @@
                 <input type="email" id="regEmail" placeholder="メールアドレス">
                 <input type="password" id="regPassword" placeholder="パスワード（半角英数）">
 
-                <p style="font-size: 12px; color: #666; text-align: center; margin-top: 15px;">目標を入力するか、一覧から検索・選択してください。
+                <p style="font-size: 12px; color: var(--text-sub2); text-align: center; margin-top: 15px;">目標を入力するか、一覧から検索・選択してください。
                 </p>
                 <input type="text" id="regName" placeholder="お名前">
                 <input type="text" id="regGoal" placeholder="🔍 学習の目標を入力" oninput="filterTags()">
@@ -823,7 +823,7 @@
                         <div class="goal-tags"><span class="goal-tag" onclick="setGoal('SPI')">#SPI</span><span
                                 class="goal-tag" onclick="setGoal('玉手箱')">#玉手箱</span><span class="goal-tag"
                                 onclick="setGoal('GAB')">#GAB</span><span class="goal-tag"
-                                onclick="setGoal('CAB')">#CAB</span><span class="goal-tag"
+                                onclick="setGoal('CAB')">var(--muted)</span><span class="goal-tag"
                                 onclick="setGoal('TG-WEB')">#TG-WEB</span></div>
                     </div>
                 </div>
@@ -865,15 +865,15 @@
             </div>
 
             <div id="warningBanner"
-                style="display: none; background: #FFEBEE; border: 2px solid var(--warn); color: #C62828; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(229,57,53,0.15);">
+                style="display: none; background: var(--soft); border: 2px solid var(--warn); color: var(--warn); padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(229,57,53,0.15);">
             </div>
 
             <div id="countdownBox" class="card"
                 style="text-align: center; background: linear-gradient(135deg, var(--info-bg) 0%, var(--info-bg2) 100%); display: none;">
                 <div style="font-size: 14px; color: var(--info-text); font-weight: bold;">目標の期日まで</div>
-                <div id="daysLeft" style="font-size: 36px; font-weight: bold; color: #0D47A1; margin: 5px 0;">あと -- 日
+                <div id="daysLeft" style="font-size: 36px; font-weight: bold; color: var(--info-text); margin: 5px 0;">あと -- 日
                 </div>
-                <div id="goalDateText" style="font-size: 12px; color: #1976D2;"></div>
+                <div id="goalDateText" style="font-size: 12px; color: var(--info-text);"></div>
             </div>
 
             <div id="monodePrompt" onclick="confirmGraduate()"
@@ -895,7 +895,7 @@
                         <label style="position:relative; display:inline-block; width:50px; height:28px; cursor:pointer;">
                             <input type="checkbox" id="darkToggle" onchange="toggleDarkMode()" style="opacity:0; width:0; height:0;">
                             <span id="darkSlider" style="position:absolute; top:0; left:0; right:0; bottom:0; background:var(--muted); border-radius:28px; transition:0.3s;"></span>
-                            <span id="darkKnob" style="position:absolute; height:22px; width:22px; left:3px; top:3px; background:#fff; border-radius:50%; transition:0.3s;"></span>
+                            <span id="darkKnob" style="position:absolute; height:22px; width:22px; left:3px; top:3px; background:var(--card-plain); border-radius:50%; transition:0.3s;"></span>
                         </label>
                     </div>
                     <button onclick="openProfileModal()">プロフィール（名前・画像）</button>
@@ -918,15 +918,15 @@
                         ご意見・ご感想・不具合のご報告は、開発者まで気軽にお寄せください。
                         いただいた声は、今後の改善に役立てます。</p>
                     <a href="mailto:ohgy.dev@gmail.com?subject=みんスタへのご意見"
-                        style="display:block; text-align:center; text-decoration:none; background:#A1887F; color:#fff; border-radius:30px; padding:12px; font-size:14px; font-weight:bold; margin-bottom:8px;">
+                        style="display:block; text-align:center; text-decoration:none; background:#A1887F; color:var(--card-plain); border-radius:30px; padding:12px; font-size:14px; font-weight:bold; margin-bottom:8px;">
                         ご意見・お問い合わせ</a>
-                    <p style="font-size:11px; color:#A99F8C; text-align:center; margin:0 0 18px 0;">
+                    <p style="font-size:11px; color:var(--text-sub); text-align:center; margin:0 0 18px 0;">
                         ohgy.dev@gmail.com</p>
                     <p style="font-size:12px; color:var(--text-sub2); line-height:1.8; margin:0 0 12px 0;">
                         みんスタは個人で開発・運営しています。応援いただける方は、こちらから支援できます。
                         いただいた支援は、みんスタの運営・開発に充てさせていただきます。</p>
                     <a href="https://ofuse.me/467b7906" target="_blank" rel="noopener noreferrer"
-                        style="display:block; text-align:center; text-decoration:none; background:linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); color:#fff; border-radius:30px; padding:12px; font-size:14px; font-weight:bold; box-shadow:0 5px 15px rgba(76,175,80,0.4);">
+                        style="display:block; text-align:center; text-decoration:none; background:linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); color:var(--card-plain); border-radius:30px; padding:12px; font-size:14px; font-weight:bold; box-shadow:0 5px 15px rgba(76,175,80,0.4);">
                         開発を応援する</a>
                 </div>
             </div>
@@ -950,16 +950,16 @@
                     同じ目標の仲間と、もう一度3人で並走しませんか。<br>あなたのペースで、いつでも始められます。
                 </div>
                 <button id="joinGroupBtn" onclick="joinGroup()"
-                    style="background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); color: #fff; border: none; border-radius: 30px; padding: 14px 32px; font-size: 15px; font-weight: bold; box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);">
+                    style="background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%); color: var(--card-plain); border: none; border-radius: 30px; padding: 14px 32px; font-size: 15px; font-weight: bold; box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);">
                     チームに参加する
                 </button>
             </div>
 
             <div id="rankBox" class="card"
-                style="text-align: center; background: linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 100%);">
+                style="text-align: center; background: linear-gradient(135deg, var(--card) 0%, var(--soft) 100%);">
                 <span id="treeIcon" class="tree-visual">🥚</span>
-                <div id="userRank" style="font-size: 20px; font-weight: bold; color: #856404;">---</div>
-                <div id="personalTime" style="font-size: 14px; color: #666;">累計: 0 分</div>
+                <div id="userRank" style="font-size: 20px; font-weight: bold; color: var(--text-sub2);">---</div>
+                <div id="personalTime" style="font-size: 14px; color: var(--text-sub2);">累計: 0 分</div>
                 <div id="streakDisplay" class="streak-display"></div>
             </div>
 
@@ -972,7 +972,7 @@
                 </div>
 
                 <div id="myBookshelfList" class="bookshelf-list">
-                    <p style="font-size:11px; color:#888; text-align:center;">参考書を追加して、マスを埋めていきましょう！</p>
+                    <p style="font-size:11px; color:var(--text-sub); text-align:center;">参考書を追加して、マスを埋めていきましょう！</p>
                 </div>
 
                 <p
@@ -1053,7 +1053,7 @@
             </div>
 
             <div class="card"
-                style="background: linear-gradient(135deg, #F1F8E9 0%, var(--soft) 100%); border: 1px solid var(--soft-border);">
+                style="background: linear-gradient(135deg, var(--soft) 0%, var(--soft) 100%); border: 1px solid var(--soft-border);">
                 <h3 style="margin-top: 0; font-size: 14px; color: var(--heading);">今週の学習サマリー</h3>
                 <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 8px;">
                     <div>
@@ -1086,7 +1086,7 @@
             <div class="card">
                 <h3 style="margin-top: 0; font-size: 14px;">📖 自分の学習履歴</h3>
                 <div id="historyList" class="history-area" style="font-size: 12px; color: var(--text-sub);">
-                    <p style="text-align:center; color:#888;">まだ学習記録がありません。</p>
+                    <p style="text-align:center; color:var(--text-sub);">まだ学習記録がありません。</p>
                 </div>
             </div>
 
@@ -1159,9 +1159,9 @@
         <div class="modal-content" style="text-align:center;">
             <div id="memberDetailIcon" style="display:flex; justify-content:center; align-items:center; height:80px; margin-bottom:10px;"></div>
             <h3 id="memberDetailName" style="margin:0 0 4px 0; color:var(--text);"></h3>
-            <div id="memberDetailMinutes" style="font-size:12px; color:#888; margin-bottom:16px;"></div>
+            <div id="memberDetailMinutes" style="font-size:12px; color:var(--text-sub); margin-bottom:16px;"></div>
             <div id="memberDetailBadges" style="display:flex; flex-wrap:wrap; justify-content:center; gap:14px; margin-bottom:8px;"></div>
-            <div id="memberDetailNoBadge" style="font-size:12px; color:#aaa; display:none;">まだ称号はありません</div>
+            <div id="memberDetailNoBadge" style="font-size:12px; color:var(--muted); display:none;">まだ称号はありません</div>
             <button onclick="document.getElementById('memberDetailModal').style.display='none'"
                 style="background:var(--muted); margin-top:18px;">閉じる</button>
         </div>
@@ -1318,7 +1318,7 @@
             const noBadge = document.getElementById('memberDetailNoBadge');
             if (badges.length > 0) {
                 badgeBox.innerHTML = badges.map(b =>
-                    `<div style="text-align:center;"><img src="${BADGE_IMAGES[b]}" style="width:64px; height:64px;"><div style="font-size:11px; color:#5a4a42; margin-top:4px;">${BADGE_LABELS[b]}</div></div>`
+                    `<div style="text-align:center;"><img src="${BADGE_IMAGES[b]}" style="width:64px; height:64px;"><div style="font-size:11px; color:var(--text-sub2); margin-top:4px;">${BADGE_LABELS[b]}</div></div>`
                 ).join('');
                 badgeBox.style.display = 'flex';
                 noBadge.style.display = 'none';
@@ -1376,10 +1376,9 @@
                 .replace(/'/g, '&#39;');
         }
 
-        // 改良（セキュリティ）: インラインstyleへ差し込む色は #rrggbb 形式のみ許可する。
-        // 想定外の値が来ても CSS が壊れたり注入されたりしないようにする。
+        // インライン style へ差し込む色は #rrggbb 形式のみ許可する(CSS インジェクション対策)。
         function safeColor(value, fallback) {
-            const fb = fallback || 'var(--accent)';
+            const fb = fallback || '#66BB6A';
             return (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) ? value : fb;
         }
 
@@ -2182,14 +2181,14 @@
                 if (!el) return;
                 if (!list.length) {
                     el.innerHTML = kind === 'today'
-                        ? '<div style="font-size:11px; color:#B8B0A0; padding:4px 0;">まだ種がありません。今日やることを宣言してみましょう</div>'
+                        ? '<div style="font-size:11px; color:var(--muted); padding:4px 0;">まだ種がありません。今日やることを宣言してみましょう</div>'
                         : '';
                 } else {
                     el.innerHTML = list.map(s => `
-                        <div style="display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px dashed #F0EDE3;">
+                        <div style="display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px dashed var(--border-soft);">
                             <span onclick="${!s.achieved && kind === 'today' ? `achieveSeed(${s.id})` : ''}"
                                 style="cursor:${!s.achieved && kind === 'today' ? 'pointer' : 'default'}; font-size:16px;">${s.achieved ? '🌱' : '⬜'}</span>
-                            <span style="flex:1; font-size:13px; ${s.achieved ? 'text-decoration:line-through; color:#9CCC9C;' : 'color:var(--text-sub);'}">${escapeHtml(s.content)}</span>
+                            <span style="flex:1; font-size:13px; ${s.achieved ? 'text-decoration:line-through; color:var(--accent-light);' : 'color:var(--text-sub);'}">${escapeHtml(s.content)}</span>
                             <span onclick="deleteSeed(${s.id})"
                                 style="cursor:pointer; color:var(--muted); padding:0 4px; display:inline-flex; align-items:center;"><svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
                         </div>`).join('');
@@ -2545,7 +2544,7 @@
 
             const currentSelectedId = select.value;
             if (myBooks.length === 0) {
-                shelfList.innerHTML = `<p style="font-size:11px; color:#888; text-align:center;">参考書を追加して、マスを埋めていきましょう！</p>`;
+                shelfList.innerHTML = `<p style="font-size:11px; color:var(--text-sub); text-align:center;">参考書を追加して、マスを埋めていきましょう！</p>`;
             } else {
                 shelfList.innerHTML = '';
             }
@@ -2733,9 +2732,9 @@
                 currentSearchStartIndex = 0;
 
                 searchBtn.disabled = true;
-                searchBtn.style.background = "#D7CCC8";
+                searchBtn.style.background = "var(--border)";
                 searchBtn.innerText = "検索中...";
-                resultsDiv.innerHTML = '<p style="font-size:12px; color:#666;">探索中...</p>';
+                resultsDiv.innerHTML = '<p style="font-size:12px; color:var(--text-sub2);">探索中...</p>';
             }
 
             try {
@@ -2777,9 +2776,9 @@
 
                 } else {
                     if (!isLoadMore) {
-                        resultsDiv.innerHTML = '<p style="font-size:12px; color:#666;">見つかりませんでした</p>';
+                        resultsDiv.innerHTML = '<p style="font-size:12px; color:var(--text-sub2);">見つかりませんでした</p>';
                     } else {
-                        resultsDiv.innerHTML += '<div style="display:flex; align-items:center; padding:0 10px;"><p style="font-size:11px; color:#888; margin:0; white-space:nowrap;">これ以上はありません</p></div>';
+                        resultsDiv.innerHTML += '<div style="display:flex; align-items:center; padding:0 10px;"><p style="font-size:11px; color:var(--text-sub); margin:0; white-space:nowrap;">これ以上はありません</p></div>';
                     }
                 }
             } catch (error) {
@@ -3227,7 +3226,7 @@
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, color: 'var(--text-sub)' } }
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }, color: getComputedStyle(document.body).getPropertyValue('--text-sub').trim() || '#8D6E63' } }
                     },
                     cutout: '65%'
                 }
@@ -3240,7 +3239,7 @@
         }
 
         function getRandomColor() {
-            const colors = ['var(--warn-soft)', '#EC407A', '#AB47BC', '#7E57C2', '#5C6BC0', '#42A5F5', '#29B6F6', '#26C6DA', '#26A69A', 'var(--accent)', '#9CCC65', '#D4E157', '#FFEE58', 'var(--amber)', '#FFA726', '#FF7043'];
+            const colors = ['#EF5350', '#EC407A', '#AB47BC', '#7E57C2', '#5C6BC0', '#42A5F5', '#29B6F6', '#26C6DA', '#26A69A', '#66BB6A', '#9CCC65', '#D4E157', '#FFEE58', '#FFCA28', '#FFA726', '#FF7043'];
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
@@ -3310,7 +3309,7 @@
 
                 const historyList = document.getElementById('historyList');
                 if (reports.length === 0) {
-                    historyList.innerHTML = '<p style="text-align:center; color:#888;">まだ学習記録がありません。</p>';
+                    historyList.innerHTML = '<p style="text-align:center; color:var(--text-sub);">まだ学習記録がありません。</p>';
                 } else {
                     historyList.innerHTML = reports.map(r => {
                         const d = new Date(r.reported_at);
@@ -3318,13 +3317,13 @@
                         let bookLabel = "";
                         if (r.book_id) {
                             const b = myBooks.find(bk => bk.id === r.book_id);
-                            if (b) bookLabel = `<span style="background:${safeColor(b.color)}; color:white; padding:2px 6px; border-radius:10px; font-size:9px; margin-right:5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">${escapeHtml(b.title)}</span>`;
+                            if (b) bookLabel = `<span style="background:${safeColor(b.color)}; color:var(--card-plain); padding:2px 6px; border-radius:10px; font-size:9px; margin-right:5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">${escapeHtml(b.title)}</span>`;
                         }
                         // 改良: 削除アイコンのクリックはイベント委譲で処理し、報告内容は
                         // エスケープして表示する（記録内容に記号が含まれても安全）。
-                        return `<div style="background:white; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid var(--border); position:relative;">
+                        return `<div style="background:var(--card-plain); padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid var(--border); position:relative;">
                         <div data-action="delete-report" data-report-id="${r.id}" style="position:absolute; top:8px; right:8px; cursor:pointer; opacity:0.6; transition:0.2s; display:flex; align-items:center;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="この記録を削除"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
-                        <div style="font-size:10px; color:#888; margin-bottom:4px;">📅 ${dateStr}</div>
+                        <div style="font-size:10px; color:var(--text-sub); margin-bottom:4px;">📅 ${dateStr}</div>
                         <div style="line-height:1.4; padding-right:20px;">${bookLabel} ${escapeHtml(r.content)} <span style="font-weight:bold; color:var(--heading);">(${r.study_minutes}分)</span></div>
                     </div>`;
                     }).join('');
@@ -3403,7 +3402,7 @@
                                 badges.map(b => `<img src="${BADGE_IMAGES[b]}" style="width:16px; height:16px;">`).join('') +
                                 `</div>`;
                         }
-                        return `<div onclick="openMemberDetail(${idx})" style="cursor:pointer; text-align:center; min-width: 70px; background: white; padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"><div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: #888;">${m.minutes}分</div>${badgeHtml}</div>`;
+                        return `<div onclick="openMemberDetail(${idx})" style="cursor:pointer; text-align:center; min-width: 70px; background: var(--card-plain); padding: 10px 5px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"><div style="display: flex; justify-content: center; align-items: center; height: 40px; margin-bottom: 5px;">${iconHtml}</div><div style="font-size: 11px; font-weight: bold; margin-top: 5px; color:var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(m.name)}</div><div style="font-size: 10px; color: var(--text-sub);">${m.minutes}分</div>${badgeHtml}</div>`;
                     }).join('');
                 } catch (e) {
                     console.error('チームメンバーの取得に失敗しました:', e);

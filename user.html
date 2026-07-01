@@ -46,34 +46,36 @@
             --warn-soft: #EF5350;
             --amber: #FFCA28;
             --tabbar-bg: rgba(255, 253, 248, 0.97);
+            --container-bg: #FFFEF8;
         }
         /* ===== ダークテーマ（温かみのある夜） ===== */
         body.dark {
-            --bg-grad-from: #1F1B18;
-            --bg-grad-to: #14110F;
-            --bg: #181513;
-            --card: #262119;
-            --card-plain: #2A241E;
-            --text: #EFE7DA;
-            --text-sub: #B5A491;
-            --text-sub2: #A89685;
-            --border: #3A332B;
-            --border-soft: #2E2820;
-            --muted: #4A4138;
-            --accent: #7CC47F;
-            --accent-strong: #6BB56F;
-            --accent-light: #5E8C60;
-            --heading: #9CC8A0;
-            --soft: #232B22;
-            --soft-border: #36412F;
-            --info-bg: #1E2A38;
-            --info-bg2: #2A3E50;
-            --info-text: #7FB0D8;
-            --grass-empty: #36302A;
-            --warn: #E57373;
-            --warn-soft: #C75C5C;
-            --amber: #E0A93A;
-            --tabbar-bg: rgba(28, 24, 21, 0.97);
+            --bg-grad-from: #0A0A0A;
+            --bg-grad-to: #000000;
+            --bg: #000000;
+            --card: #1A1A1C;
+            --card-plain: #202022;
+            --text: #F2F2F2;
+            --text-sub: #A8A8AC;
+            --text-sub2: #8E8E92;
+            --border: #2C2C2E;
+            --border-soft: #242426;
+            --muted: #48484A;
+            --accent: #5FD466;
+            --accent-strong: #4FC356;
+            --accent-light: #3A6B3D;
+            --heading: #7DD883;
+            --soft: #14241A;
+            --soft-border: #26402C;
+            --info-bg: #16202C;
+            --info-bg2: #22344A;
+            --info-text: #6FB2E8;
+            --grass-empty: #2A2A2C;
+            --warn: #FF6B6B;
+            --warn-soft: #E05555;
+            --amber: #E5A83A;
+            --tabbar-bg: rgba(16, 16, 18, 0.98);
+            --container-bg: #000000;
         }
         body {
             font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Quicksand', sans-serif;
@@ -89,7 +91,7 @@
         .app-container {
             width: 100%;
             max-width: 400px;
-            background: var(--card);
+            background: var(--container-bg);
             min-height: 100vh;
             padding: 30px 20px;
             box-sizing: border-box;
@@ -1241,7 +1243,7 @@
 
     <div id="editBookModal" class="modal">
         <div class="modal-content">
-            <h3 id="editBookModalTitle" style="margin-top:0; font-size:15px; color:var(--text);">⚙️ 本の編集</h3>
+            <h3 id="editBookModalTitle" style="margin-top:0; font-size:15px; color:var(--text); display:flex; align-items:center; gap:8px;"><svg width="17" height="17" style="flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg><span id="editBookTitleText">本の編集</span></h3>
 
             <label style="font-size: 12px; color: var(--text-sub); margin-top:15px; display:block; text-align:left;">🎨
                 芝生とマスの色を変更</label>
@@ -2573,7 +2575,7 @@
                 // これにより引用符・記号を含むタイトルでも壊れず、XSS も防げる。
                 shelfList.innerHTML += `
                     <div class="book-progress-card" data-action="select-book" data-book-id="${b.id}" data-book-title="${escapeHtml(b.title)}" style="border-left: 4px solid ${color}; position: relative;">
-                        <div data-action="edit-book" data-book-id="${b.id}" data-book-title="${escapeHtml(b.title)}" data-book-color="${color}" style="position: absolute; top: 6px; right: 6px; font-size: 13px; cursor: pointer; padding: 4px; background: rgba(255,255,255,0.85); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.15); z-index: 10;">⚙️</div>
+                        <div data-action="edit-book" data-book-id="${b.id}" data-book-title="${escapeHtml(b.title)}" data-book-color="${color}" style="position: absolute; top: 8px; right: 8px; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-sub); z-index: 10;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></div>
                         <img src="${escapeHtml(b.cover_image || NO_IMAGE_SVG)}" class="book-cover-mini">
                         <div class="book-info-area">
                             <div class="book-title-mini">${escapeHtml(b.title)}</div>
@@ -2594,7 +2596,7 @@
         // 改良: イベント委譲から呼ばれるため event 引数を廃止し、bookId は数値に正規化する。
         function openEditBookModal(bookId, title, color) {
             editingBookId = parseInt(bookId);
-            document.getElementById('editBookModalTitle').innerText = `⚙️ 『${title}』の編集`;
+            document.getElementById('editBookTitleText').innerText = `『${title}』の編集`;
             document.getElementById('editBookColor').value = safeColor(color);
 
             // 内部の myBooks 配列から表紙画像を取り出す（HTMLクラッシュ対策）

@@ -637,6 +637,74 @@
             80%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
             100% { opacity: 0; transform: translate(-50%, -52%) scale(1); }
         }
+        /* ===== ログイン導入（オンボーディング） ===== */
+        #introForm .intro-catch {
+            text-align: center;
+            color: var(--heading);
+            font-weight: 700;
+            font-size: 23px;
+            letter-spacing: 1px;
+            margin: 4px 0 10px;
+        }
+
+        #introForm .intro-lead {
+            text-align: center;
+            color: var(--text-sub);
+            font-size: 12.5px;
+            line-height: 1.75;
+            margin: 0 auto 20px;
+            max-width: 260px;
+        }
+
+        #introForm .intro-features {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+
+        #introForm .intro-feature {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #introForm .intro-ic {
+            flex: 0 0 auto;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--soft);
+            color: var(--heading);
+            display: grid;
+            place-items: center;
+        }
+
+        #introForm .intro-ic svg {
+            width: 21px;
+            height: 21px;
+        }
+
+        #introForm .intro-ft {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        #introForm .intro-fs {
+            font-size: 11.5px;
+            color: var(--text-sub2);
+            margin-top: 1px;
+            line-height: 1.4;
+        }
+
+        #introForm .intro-btn-sub {
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0.92;
+            margin-left: 3px;
+        }
     </style>
 </head>
 
@@ -648,12 +716,34 @@
         <p class="subtitle">〜 みんなで育てる学習の森 〜</p>
 
         <div id="authScreen" class="card">
-            <div id="loginForm">
+            <div id="introForm">
+                <p class="intro-catch">競わずに、3人で。</p>
+                <p class="intro-lead">ランキングも、いいねもない。<br>同じ目標の仲間と並走する学習アプリ。</p>
+                <div class="intro-features">
+                    <div class="intro-feature">
+                        <div class="intro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg></div>
+                        <div><div class="intro-ft">競わない</div><div class="intro-fs">ランキングも、いいねもなし</div></div>
+                    </div>
+                    <div class="intro-feature">
+                        <div class="intro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                        <div><div class="intro-ft">3人1組</div><div class="intro-fs">同じ目標の仲間と、少人数で</div></div>
+                    </div>
+                    <div class="intro-feature">
+                        <div class="intro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></div>
+                        <div><div class="intro-ft">積み重ねが見える</div><div class="intro-fs">続けた分だけ、森が育つ</div></div>
+                    </div>
+                </div>
+                <button onclick="goAuth('register')">はじめる<span class="intro-btn-sub">（新規登録）</span></button>
+                <p class="toggle-link" onclick="goAuth('login')">アカウントをお持ちの方はログイン</p>
+            </div>
+
+            <div id="loginForm" style="display: none;">
                 <h3 style="text-align:center; margin-top:0;">おかえりなさい</h3>
                 <input type="email" id="loginEmail" placeholder="メールアドレス">
                 <input type="password" id="loginPassword" placeholder="パスワード">
                 <button onclick="login()">ログイン</button>
                 <p class="toggle-link" onclick="toggleAuthMode()">▶ 新規登録はこちら</p>
+                <p class="toggle-link" onclick="backToIntro()">← もどる</p>
             </div>
 
             <div id="registerForm" style="display: none;">
@@ -848,6 +938,7 @@
                 <button onclick="register()"
                     style="background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%);">森の住人になる</button>
                 <p class="toggle-link" onclick="toggleAuthMode()">▶ すでにIDをお持ちの方（ログイン）</p>
+                <p class="toggle-link" onclick="backToIntro()">← もどる</p>
             </div>
         </div>
 
@@ -2369,6 +2460,20 @@
             const loginDiv = document.getElementById('loginForm'), regDiv = document.getElementById('registerForm');
             loginDiv.style.display = loginDiv.style.display === 'none' ? 'block' : 'none';
             regDiv.style.display = regDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // 導入画面から ログイン / 新規登録 へ進む。初見の人にはまずアプリ紹介を見せる。
+        function goAuth(target) {
+            document.getElementById('introForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = target === 'login' ? 'block' : 'none';
+            document.getElementById('registerForm').style.display = target === 'register' ? 'block' : 'none';
+        }
+
+        // 導入画面へ戻る。
+        function backToIntro() {
+            document.getElementById('introForm').style.display = 'block';
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'none';
         }
 
         async function register() {

@@ -869,6 +869,50 @@
             border-radius: 16px;
             box-shadow: none;
         }
+        /* ===== ホーム画面追加（PWA）の案内 ===== */
+        .pwa-steps {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .pwa-steps li {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            font-size: 13px;
+            color: var(--text-sub);
+            line-height: 1.7;
+            margin-bottom: 10px;
+        }
+
+        .pwa-num {
+            flex: 0 0 auto;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--soft);
+            color: var(--heading);
+            font-size: 11px;
+            font-weight: bold;
+            display: grid;
+            place-items: center;
+            margin-top: 2px;
+        }
+
+        .pwa-share-ic {
+            display: inline-flex;
+            vertical-align: -3px;
+            margin: 0 2px;
+        }
+
+        .pwa-note {
+            font-size: 11.5px;
+            color: var(--text-sub2);
+            line-height: 1.7;
+            margin: 12px 0 0;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -1449,6 +1493,25 @@
         </div>
     </div>
 
+    <!-- ホーム画面追加（PWA）の案内。初回の学習報告のあとに1回だけ表示する -->
+    <div id="pwaModal" class="modal" style="display:none; z-index:8006;">
+        <div class="modal-content" style="max-width:320px; padding:24px 22px;">
+            <h2 style="font-size:17px; margin:0 0 12px; color:var(--heading); text-align:center;">ホーム画面に追加すると便利です</h2>
+            <ol class="pwa-steps" id="pwaStepsIos">
+                <li><span class="pwa-num">1</span><span>画面下（PCは上）の共有ボタン<span class="pwa-share-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span>をタップ</span></li>
+                <li><span class="pwa-num">2</span><span><b>「ホーム画面に追加」</b>を選ぶ</span></li>
+                <li><span class="pwa-num">3</span><span>右上の<b>「追加」</b>をタップ</span></li>
+            </ol>
+            <ol class="pwa-steps" id="pwaStepsOther" style="display:none;">
+                <li><span class="pwa-num">1</span><span>ブラウザ右上の<b>メニュー（⋮）</b>を開く</span></li>
+                <li><span class="pwa-num">2</span><span><b>「アプリをインストール」</b>または<b>「ホーム画面に追加」</b>を選ぶ</span></li>
+            </ol>
+            <p class="pwa-note">1タップで開けて、通知も受け取りやすくなります。</p>
+            <button onclick="closePwaPrompt()" style="width:100%; margin:16px 0 0;">わかった</button>
+            <p class="toggle-link" style="margin-top:12px;" onclick="closePwaPrompt()">あとで</p>
+        </div>
+    </div>
+
     <div id="memberDetailModal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <div id="memberDetailIcon" style="display:flex; justify-content:center; align-items:center; height:80px; margin-bottom:10px;"></div>
@@ -1848,6 +1911,77 @@
         let accumulatedSeconds = 0;
         let currentSecondsDisplay = 0;
 
+        // ===== タイマー状態の保存と復元 =====
+        // PWAはOSにメモリを回収されるとページごと再読み込みされ、変数が消える。
+        // 経過時間の計算自体は Date.now() との引き算なのでズレないが、基準となる
+        // timerStartTime が失われると「動いていた」ことすら分からなくなる。
+        // そこで基準点だけを保存しておき、復帰時に読み戻して計測を継続する。
+        const TIMER_STATE_KEY = 'minsta_timer_state';
+
+        function saveTimerState() {
+            try {
+                localStorage.setItem(TIMER_STATE_KEY, JSON.stringify({
+                    isPomodoro: isPomodoro,
+                    isPaused: isPaused,
+                    timerStartTime: timerStartTime,
+                    accumulatedSeconds: accumulatedSeconds,
+                }));
+            } catch (e) { /* 保存できなくても計測自体は続行する */ }
+        }
+
+        function clearTimerState() {
+            try { localStorage.removeItem(TIMER_STATE_KEY); } catch (e) { }
+        }
+
+        // 起動時に呼ぶ。保存された計測があればタイマーを動作中の状態に戻す。
+        function restoreTimerState() {
+            let s = null;
+            try {
+                const raw = localStorage.getItem(TIMER_STATE_KEY);
+                if (!raw) return;
+                s = JSON.parse(raw);
+            } catch (e) { clearTimerState(); return; }
+            if (!s || typeof s.timerStartTime !== 'number') { clearTimerState(); return; }
+
+            isPomodoro = !!s.isPomodoro;
+            isPaused = !!s.isPaused;
+            timerStartTime = s.timerStartTime;
+            accumulatedSeconds = s.accumulatedSeconds || 0;
+
+            if (isPaused) {
+                // 一時停止のまま中断された場合。経過は accumulatedSeconds に入っている。
+                currentSecondsDisplay = isPomodoro
+                    ? Math.max(0, (25 * 60) - accumulatedSeconds)
+                    : accumulatedSeconds;
+                updateDisplay();
+                prepareTimerUI();
+                const btn = document.getElementById('pauseBtn');
+                btn.innerText = "再開する"; btn.style.background = "var(--accent)"; btn.style.color = "white";
+                return;
+            }
+
+            prepareTimerUI();
+            timerObj = setInterval(timerTick, 500);
+            // 不在中に25分を過ぎたポモドーロは、この初回tickが完了処理へ進める。
+            timerTick();
+        }
+
+        // ===== ポモドーロ完了のサーバ通知予約 =====
+        // アプリがOSに停止されている間は端末側で鐘を鳴らせないため、
+        // 開始時にサーバへ「終了時刻に知らせて」と予約しておく。
+        // 端末側で鐘が鳴った場合はその場で取り消すので、通知が届くのは
+        // アプリが落ちていた時だけ。失敗しても計測には影響させない。
+        function schedulePomodoroAlarm(seconds) {
+            apiFetch('/pomodoro/alarm', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ seconds_from_now: Math.max(1, Math.round(seconds)) })
+            }).catch(() => { });
+        }
+
+        function cancelPomodoroAlarm() {
+            apiFetch('/pomodoro/alarm', { method: 'DELETE' }).catch(() => { });
+        }
+
         let myBooks = [];
         const NO_IMAGE_SVG = "data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2280%22%20height%3D%22110%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23eee%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2212%22%20fill%3D%22%23999%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E";
         const DEFAULT_AVATAR = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2250%22%20fill%3D%22%23EAE5D9%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2265%22%20font-size%3D%2250%22%20text-anchor%3D%22middle%22%3E👤%3C%2Ftext%3E%3C%2Fsvg%3E";
@@ -2211,6 +2345,7 @@
                         await fetchBooks();
                         await fetchData();
                         connectWebSocket();
+                        restoreTimerState(); // 中断された計測があれば再開する
                     } else {
                         // トークンが無効。ログイン画面のまま（後始末は apiFetch 側で実施済み）。
                         authToken = null;
@@ -2518,6 +2653,7 @@
 
         function tutoAccept() {
             document.getElementById('tutoKick').style.display = 'none';
+            showPwaPromptIfPending(600); // キック規約のあと、1テンポ置いて案内する
         }
 
         // --- 各手順の完了検知 ---
@@ -2548,6 +2684,51 @@
             });
             // 手順4（報告送信）の完了は submitReport 成功時に進める
         })();
+
+        // ===== ホーム画面追加（PWA）の案内 =====
+        // 初回の学習報告が成功したあとに1回だけ表示する。
+        // ・すでにホーム画面から起動している場合は出さない
+        // ・「わかった」「あとで」どちらでも、この端末では二度と出さない
+        let pwaPromptPending = false;
+
+        function isStandaloneApp() {
+            return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                || window.navigator.standalone === true;
+        }
+
+        function isIosDevice() {
+            const ua = navigator.userAgent;
+            // iPadOS 13以降はMacintoshを名乗るため、タッチ点数でも判定する
+            return /iPad|iPhone|iPod/.test(ua) || (ua.indexOf('Macintosh') !== -1 && navigator.maxTouchPoints > 1);
+        }
+
+        // 報告成功時に呼ぶ。表示条件を満たすときだけ「表示待ち」にする。
+        function maybeQueuePwaPrompt() {
+            if (localStorage.getItem('minsta_pwa_prompted')) return;
+            if (isStandaloneApp()) {
+                // すでに追加済みなら案内は不要。以後の判定も省くため記録しておく。
+                localStorage.setItem('minsta_pwa_prompted', '1');
+                return;
+            }
+            pwaPromptPending = true;
+        }
+
+        // 表示待ちがあれば、delayMs後に案内を1回だけ出す。
+        function showPwaPromptIfPending(delayMs) {
+            if (!pwaPromptPending) return;
+            pwaPromptPending = false;
+            setTimeout(() => {
+                localStorage.setItem('minsta_pwa_prompted', '1');
+                const ios = isIosDevice();
+                document.getElementById('pwaStepsIos').style.display = ios ? 'block' : 'none';
+                document.getElementById('pwaStepsOther').style.display = ios ? 'none' : 'block';
+                document.getElementById('pwaModal').style.display = 'flex';
+            }, delayMs);
+        }
+
+        function closePwaPrompt() {
+            document.getElementById('pwaModal').style.display = 'none';
+        }
         // その日最初の読み込みでサーバーが掲示板へ宣言を流す(案A)。
         // 達成は祝うが未達成は晒さない。サボり点検とは無関係。
         let seedsCache = { today: [], tomorrow: [] };
@@ -3326,6 +3507,8 @@
         function handlePomodoroEnd() {
             clearInterval(timerObj);
             timerObj = null;
+            clearTimerState(); // 25分が完了。復帰対象から外す。
+            cancelPomodoroAlarm(); // 端末側で鐘が鳴ったのでサーバ通知は取り消す
             pauseCurrentBGM();
             try { document.getElementById('bellSound').play(); } catch (e) { }
 
@@ -3363,6 +3546,7 @@
             updateDisplay();
             prepareTimerUI();
             timerObj = setInterval(timerTick, 500);
+            saveTimerState();
         }
 
         function startPomodoro() {
@@ -3376,6 +3560,8 @@
             updateDisplay();
             prepareTimerUI();
             timerObj = setInterval(timerTick, 500);
+            saveTimerState();
+            schedulePomodoroAlarm(25 * 60); // アプリが落ちても届く完了通知を予約
         }
 
         function prepareTimerUI() {
@@ -3399,6 +3585,8 @@
                 const btn = document.getElementById('pauseBtn');
                 btn.innerText = "再開する"; btn.style.background = "var(--accent)"; btn.style.color = "white";
                 isPaused = true;
+                saveTimerState();
+                if (isPomodoro) cancelPomodoroAlarm(); // 停止中は鳴らさない
             } else {
                 playCurrentBGM();
                 timerStartTime = Date.now();
@@ -3407,12 +3595,16 @@
                 btn.innerText = "一時停止"; btn.style.background = "var(--amber)"; btn.style.color = "var(--text)";
                 isPaused = false;
                 timerObj = setInterval(timerTick, 500);
+                saveTimerState();
+                if (isPomodoro) schedulePomodoroAlarm(Math.max(1, 25 * 60 - accumulatedSeconds)); // 残り時間で予約し直す
             }
         }
 
         function stopTimer() {
             if (timerObj) clearInterval(timerObj);
             timerObj = null;
+            clearTimerState(); // 計測は終了。復帰対象から外す。
+            if (isPomodoro) cancelPomodoroAlarm(); // 途中終了。通知は不要。
             pauseCurrentBGM();
             let mins = 0;
             if (!isPomodoro) {
@@ -3507,10 +3699,16 @@
             document.getElementById('reportContent').value = ""; document.getElementById('studyMinutes').value = "0";
             if (timerObj) clearInterval(timerObj);
             timerObj = null;
+            clearTimerState(); // 報告済み。中断復帰の対象から外す。
             currentSecondsDisplay = 0; updateDisplay();
             resetTimerButtons();
             showReportToast(); // 報告成功のトーストを表示
-            if (tutoStep === 4) tutoFinish(); // チュートリアル最終手順の完了
+            maybeQueuePwaPrompt(); // 初回の報告なら、ホーム画面追加の案内を予約
+            if (tutoStep === 4) {
+                tutoFinish(); // チュートリアル最終手順の完了（案内は規約OKの後に出す）
+            } else {
+                showPwaPromptIfPending(2100); // 規約モーダルが出ないパスでは、トーストが消えた後に案内
+            }
             fetchData();
         }
 

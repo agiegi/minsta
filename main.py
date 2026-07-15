@@ -193,6 +193,19 @@ class PushSubscription(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
+class PomodoroAlarm(Base):
+    """ポモドーロ完了通知の予約（1ユーザー1件）。
+    アプリがバックグラウンドでOSに停止されると、25分経過の鐘を鳴らせない。
+    そこで開始時にサーバへ「25分後に知らせて」と予約し、バッチが期限を
+    迎えた予約へプッシュ通知を送る。アプリが生きていれば完了時に予約を
+    取り消すため、通知が届くのは端末側で鐘が鳴らせなかった場合だけ。"""
+    __tablename__ = "pomodoro_alarms"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    notify_at = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
 Base.metadata.create_all(bind=engine)
 
 
@@ -647,8 +660,63 @@ def send_study_reminders(db: Session):
                 removed += 1
             else:
                 print(f"push送信に失敗 (user {target.id}): {push_error}")
-        except Exception as push_error:
-            print(f"push送信に失敗 (user {target.id}): {push_error}")
+    return sent, removed
+
+
+def send_due_pomodoro_alarms(db: Session):
+    """期限を迎えたポモドーロ完了通知を送り、予約を削除する。
+    バッチのループ(約60秒間隔)から毎周呼ばれるため、通知は期限から
+    最大1分ほど遅れて届くことがある。アプリが前面にあれば端末側の鐘が
+    正確に鳴り、予約はその時点で取り消されるので二重にはならない。
+    失効した購読(404/410)はリマインダーと同様にその場で掃除する。
+    戻り値: (送信成功数, 掃除した失効購読数)
+    """
+    now = utcnow()
+    due = db.query(PomodoroAlarm).filter(PomodoroAlarm.notify_at <= now).all()
+    if not due:
+        return 0, 0
+
+    payload = json.dumps(
+        {
+            "title": "25分の集中が終わりました",
+            "body": "おつかれさまです。アプリを開くと記録が反映されます 🌱",
+        }
+    )
+    sent = 0
+    removed = 0
+    for alarm in due:
+        if PUSH_ENABLED:
+            subs = (
+                db.query(PushSubscription)
+                .filter(PushSubscription.user_id == alarm.user_id)
+                .all()
+            )
+            for sub in subs:
+                try:
+                    webpush(
+                        subscription_info={
+                            "endpoint": sub.endpoint,
+                            "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+                        },
+                        data=payload,
+                        vapid_private_key=VAPID_PRIVATE_KEY,
+                        vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
+                    )
+                    sent += 1
+                except WebPushException as push_error:
+                    status = getattr(
+                        getattr(push_error, "response", None), "status_code", None
+                    )
+                    if status in (404, 410):
+                        db.delete(sub)
+                        removed += 1
+                    else:
+                        print(f"ポモ通知に失敗 (user {alarm.user_id}): {push_error}")
+                except Exception as push_error:
+                    print(f"ポモ通知に失敗 (user {alarm.user_id}): {push_error}")
+        # 送信可否に関わらず予約は消化する（push無効環境でも溜めない）
+        db.delete(alarm)
+    db.commit()
     return sent, removed
 
 
@@ -658,6 +726,20 @@ async def daily_check_task():
     last_reminder_date = None  # 22時リマインダーの送信済み日(重複送信ガード)
     while True:
         try:
+            # ポモドーロ完了通知: 期限が来た予約を毎周(約60秒ごと)点検して送る。
+            alarm_db = SessionLocal()
+            try:
+                p_sent, p_removed = send_due_pomodoro_alarms(alarm_db)
+                if p_sent or p_removed:
+                    print(
+                        f"🔔 ポモドーロ完了通知を{p_sent}件送信"
+                        f"(失効購読の掃除{p_removed}件)"
+                    )
+            except Exception as alarm_error:
+                print(f"ポモドーロ通知の点検に失敗: {alarm_error}")
+            finally:
+                alarm_db.close()
+
             # 22時(JST)の学習リマインダー。60秒間隔のループでも取りこぼさない
             # よう「22時台でその日未送信なら送る」判定にしている(分==0判定は
             # ループのずれで飛ばす恐れがある)。タイムゾーンは明示的にJST。
@@ -1285,6 +1367,50 @@ def push_unsubscribe(
         ).delete(synchronize_session=False)
         db.commit()
     return {"message": "unsubscribed"}
+
+
+@app.post("/pomodoro/alarm")
+def schedule_pomodoro_alarm(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """ポモドーロ完了通知を予約する（既存の予約は置き換え）。
+    アプリ側の鐘と二重に鳴らさないため、期限には5秒の猶予を足す。
+    アプリが生きていれば端末の鐘が先に鳴り、その場で予約が取り消される。"""
+    seconds = data.get("seconds_from_now")
+    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)):
+        raise HTTPException(
+            status_code=400, detail="seconds_from_now を数値で指定してください"
+        )
+    if not (1 <= seconds <= 2 * 60 * 60):
+        raise HTTPException(
+            status_code=400, detail="seconds_from_now は1〜7200の範囲で指定してください"
+        )
+    db.query(PomodoroAlarm).filter(
+        PomodoroAlarm.user_id == current_user.id
+    ).delete(synchronize_session=False)
+    db.add(
+        PomodoroAlarm(
+            user_id=current_user.id,
+            notify_at=utcnow() + timedelta(seconds=int(seconds) + 5),
+        )
+    )
+    db.commit()
+    return {"message": "scheduled"}
+
+
+@app.delete("/pomodoro/alarm")
+def cancel_pomodoro_alarm(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """ポモドーロ完了通知の予約を取り消す（未予約なら何もしない）。"""
+    db.query(PomodoroAlarm).filter(
+        PomodoroAlarm.user_id == current_user.id
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"message": "canceled"}
 
 
 # ===== 今日の種(1日ごとの小さな宣言) =====

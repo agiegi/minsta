@@ -5,6 +5,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
     Header,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
@@ -29,6 +30,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import secrets
+import hashlib
 import random
 import bcrypt
 import asyncio
@@ -105,6 +107,8 @@ class Group(Base):
     __tablename__ = "groups"
     id = Column(Integer, primary_key=True, index=True)
     goal = Column(String)
+    # どの塾のグループか。None なら塾に属さない一般のグループ。
+    juku_id = Column(Integer, ForeignKey("jukus.id"), nullable=True, index=True)
 
 
 class User(Base):
@@ -122,12 +126,15 @@ class User(Base):
     # 門出（卒業）を一度でも経験したか。桜バッジの表示に使う。
     has_graduated = Column(Boolean, default=False)
     # 称号バッジ（運営が手動で付与）。開発者=大樹 / アドバイザー=雫 / テスター=双葉
+    # 所属する塾。None なら個人利用（これまで通りの動作）。
+    juku_id = Column(Integer, ForeignKey("jukus.id"), nullable=True, index=True)
     is_developer = Column(Boolean, default=False)
     is_advisor = Column(Boolean, default=False)
     is_tester = Column(Boolean, default=False)
     # 登録日時(UTC)。既存ユーザーは NULL。コホート分析に使用。
     created_at = Column(DateTime, nullable=True, default=utcnow)
     # 認証用トークン。ログイン/登録時に発行し、リクエストの本人確認に使う。
+    # 旧方式の名残。現在は auth_tokens テーブルで管理しており、この列は使用しない。
     auth_token = Column(String, nullable=True, index=True)
 
 
@@ -147,7 +154,8 @@ class Report(Base):
     book_id = Column(Integer, ForeignKey("books.id"), nullable=True, index=True)
     content = Column(String)
     study_minutes = Column(Integer)
-    reported_at = Column(DateTime, default=utcnow)
+    # 当日判定・芝生・連続記録・サボり点検で範囲検索するため索引を張る
+    reported_at = Column(DateTime, default=utcnow, index=True)
 
 
 class Message(Base):
@@ -193,6 +201,36 @@ class PushSubscription(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
+class Juku(Base):
+    """塾。塾向け展開の土台。
+
+    生徒は塾コードを入力すると、その塾に所属する。
+    所属すると、チームは「同じ塾の中の、同じ目標の生徒」から組まれる。
+    塾に所属していない利用者はこれまで通り、誰とでも組まれる。
+    """
+    __tablename__ = "jukus"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    code = Column(String, unique=True, index=True)  # 生徒に配る合言葉
+    created_at = Column(DateTime, default=utcnow)
+
+
+class AuthToken(Base):
+    """ログインセッション。1ユーザーが複数端末で同時にログインできる。
+
+    トークンそのものは保存せず、SHA-256のハッシュだけを持つ。
+    こうしておくと、万一データベースの中身が漏れても、
+    そこからログインできるトークンを復元することはできない。
+    （パスワードをハッシュで持つのと同じ考え方）
+    """
+    __tablename__ = "auth_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    token_hash = Column(String, unique=True, index=True)
+    expires_at = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
 class PomodoroAlarm(Base):
     """ポモドーロ完了通知の予約（1ユーザー1件）。
     アプリがバックグラウンドでOSに停止されると、25分経過の鐘を鳴らせない。
@@ -229,6 +267,24 @@ def ensure_schema():
             conn.execute(text("ALTER TABLE users ADD COLUMN created_at TIMESTAMP"))
             conn.commit()
 
+    # 塾向け展開で追加した列。既存の利用者・グループは NULL（＝塾に属さない）になり、
+    # これまでと同じ動作を続ける。これが無いと、利用者を読むたびに
+    # 「列が存在しない」エラーになり、アプリ全体が動かなくなる。
+    with engine.connect() as conn:
+        for table in ("users", "groups"):
+            if not inspector.has_table(table):
+                continue
+            tcols = [c["name"] for c in inspector.get_columns(table)]
+            if "juku_id" not in tcols:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN juku_id INTEGER"))
+            conn.execute(text(
+                f"CREATE INDEX IF NOT EXISTS ix_{table}_juku_id ON {table} (juku_id)"))
+        # 当日判定やサボり点検で範囲検索する列の索引（create_allは既存表に索引を足さない）
+        if inspector.has_table("reports"):
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_reports_reported_at ON reports (reported_at)"))
+        conn.commit()
+
 
 ensure_schema()
 
@@ -242,14 +298,128 @@ def get_db():
 
 
 # --- 認証 ---
-# ログイン/登録時にランダムなトークンを発行して User.auth_token に保存する。
+# ===== ログイン試行の制限（総当たり対策） =====
+# 外部ライブラリを増やさず、メモリ上で数えるだけの簡易版。
+# サーバーを再起動すると記録は消えるが、短時間に何千回と試す攻撃は防げる。
+LOGIN_MAX_FAILURES = 5          # 何回失敗したらロックするか
+LOGIN_WINDOW_SECONDS = 300      # 失敗を数える時間の幅（5分）
+LOGIN_LOCK_SECONDS = 900        # ロックする時間（15分）
+
+# キー -> 失敗した時刻のリスト
+_login_failures: Dict[str, List[datetime]] = {}
+
+
+def _login_keys(request: Request, email: str) -> List[str]:
+    """IPアドレスとメールアドレスの両方で数える。
+    IPだけだと共用回線で巻き添えが出るし、メールだけだと
+    相手を変えながら総当たりできてしまうため、両方を見る。
+    """
+    ip = request.client.host if request and request.client else "unknown"
+    return [f"ip:{ip}", f"mail:{email.lower()}"]
+
+
+def check_login_rate(request: Request, email: str):
+    """失敗が続いているならロックする。ログイン処理の最初に呼ぶ。"""
+    now = utcnow()
+    for key in _login_keys(request, email):
+        recent = [
+            t for t in _login_failures.get(key, [])
+            if (now - t).total_seconds() < LOGIN_LOCK_SECONDS
+        ]
+        _login_failures[key] = recent
+        in_window = [
+            t for t in recent if (now - t).total_seconds() < LOGIN_WINDOW_SECONDS
+        ]
+        if len(in_window) >= LOGIN_MAX_FAILURES:
+            raise HTTPException(
+                status_code=429,
+                detail="ログインの試行が続いたため、しばらく受け付けられません。時間をおいて再度お試しください",
+            )
+
+
+def record_login_failure(request: Request, email: str):
+    """失敗を記録する。"""
+    now = utcnow()
+    for key in _login_keys(request, email):
+        _login_failures.setdefault(key, []).append(now)
+
+
+def clear_login_failures(request: Request, email: str):
+    """成功したら記録を消す。"""
+    for key in _login_keys(request, email):
+        _login_failures.pop(key, None)
+
+
+# ログイン/登録時にセッションを作り、トークンを発行する（保存はハッシュのみ）。
 # 以降のリクエストは「Authorization: Bearer <token>」ヘッダーでトークンを送り、
 # サーバーはトークンからユーザーを特定する（opaque token 方式）。
 # これにより、リクエストの user_id を詐称して他人のデータを操作することを防ぐ。
 
 
+# ログインを維持する期間。これを過ぎたトークンは無効になる。
+TOKEN_LIFETIME_DAYS = 60
+
+
 def issue_token() -> str:
+    """推測できないランダムな文字列を作る（これが利用者に渡る本体）。"""
     return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    """トークンをSHA-256で要約する。保存と照合はこの値だけで行う。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_session(db: Session, user: User) -> str:
+    """新しいセッションを作り、利用者に渡すトークンを返す。
+
+    端末ごとに1行増えるだけなので、スマホとPCで同時にログインできる。
+    ついでに、その利用者の期限切れセッションを掃除しておく。
+    """
+    db.query(AuthToken).filter(
+        AuthToken.user_id == user.id, AuthToken.expires_at <= utcnow()
+    ).delete(synchronize_session=False)
+    token = issue_token()
+    db.add(
+        AuthToken(
+            user_id=user.id,
+            token_hash=hash_token(token),
+            expires_at=utcnow() + timedelta(days=TOKEN_LIFETIME_DAYS),
+        )
+    )
+    db.commit()
+    return token
+
+
+def user_from_token(db: Session, token: str) -> Optional[User]:
+    """トークンから利用者を特定する。期限切れ・不正なら None。"""
+    if not token:
+        return None
+    row = (
+        db.query(AuthToken)
+        .filter(AuthToken.token_hash == hash_token(token))
+        .first()
+    )
+    if not row:
+        # 旧方式（users.auth_token に平文で保存していた頃）のトークンなら、
+        # 新方式のセッションに移し替えてから通す。移し替えたら平文は消す。
+        # これにより、更新後も利用者がログアウトされずに済む。
+        legacy = db.query(User).filter(User.auth_token == token).first()
+        if not legacy:
+            return None
+        db.add(AuthToken(
+            user_id=legacy.id,
+            token_hash=hash_token(token),
+            expires_at=utcnow() + timedelta(days=TOKEN_LIFETIME_DAYS),
+        ))
+        legacy.auth_token = None
+        db.commit()
+        return legacy
+    if row.expires_at and row.expires_at <= utcnow():
+        db.delete(row)
+        db.commit()
+        return None
+    return db.query(User).filter(User.id == row.user_id).first()
 
 
 def get_current_user(
@@ -260,7 +430,7 @@ def get_current_user(
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="ログインが必要です")
     token = authorization[len("Bearer "):]
-    user = db.query(User).filter(User.auth_token == token).first()
+    user = user_from_token(db, token)
     if not user:
         raise HTTPException(
             status_code=401, detail="セッションが無効です。再度ログインしてください"
@@ -376,11 +546,14 @@ def adjust_group_members(db: Session, group_id: int, goal: str):
             if not available_names:
                 available_names = AI_NAMES
             new_ai_id = get_custom_id(db, is_ai=True)
+            # AIメンバーもグループと同じ塾に属させる（塾の集計と整合させるため）
+            grp = db.query(Group).filter(Group.id == group_id).first()
             new_ai = User(
                 id=new_ai_id,
                 name=random.choice(available_names),
                 goal=goal,
                 group_id=group_id,
+                juku_id=grp.juku_id if grp else None,
                 is_ai=True,
             )
             db.add(new_ai)
@@ -552,8 +725,18 @@ def cleanup_old_daily_goals(db: Session, days: int = 30):
 
 
 def assign_group_logic(db: Session, user: User):
+    """利用者をチームに割り当てる。
+
+    塾に所属している場合は同じ塾の中だけで、
+    所属していない場合は塾に属さないグループの中から探す。
+    どちらも「同じ目標」であることが前提。
+    """
     try:
-        potential_groups = db.query(Group).filter(Group.goal == user.goal).all()
+        potential_groups = (
+            db.query(Group)
+            .filter(Group.goal == user.goal, Group.juku_id == user.juku_id)
+            .all()
+        )
         target_group = None
         for g in potential_groups:
             humans = (
@@ -565,7 +748,7 @@ def assign_group_logic(db: Session, user: User):
                 target_group = g
                 break
         if not target_group:
-            target_group = Group(goal=user.goal)
+            target_group = Group(goal=user.goal, juku_id=user.juku_id)
             db.add(target_group)
             db.commit()
             db.refresh(target_group)
@@ -762,8 +945,10 @@ async def daily_check_task():
                 finally:
                     reminder_db.close()
 
-            # トリガー判定は従来どおりサーバーのローカル時刻で行う（起動タイミングは不変）。
-            now = datetime.now()
+            # トリガー判定も日本時間で行う。判定窓が jst_today_start_utc() (JST基準)
+            # なのに発火だけサーバーのローカル時刻だと、サーバーがUTCの場合に
+            # JST朝9時前後で点検してしまい、「3日連続」より1日早くキックされる。
+            now = datetime.now(JST)
             if now.hour == 23 and now.minute == 59:
                 db = SessionLocal()
                 try:
@@ -898,9 +1083,17 @@ app = FastAPI(lifespan=lifespan)
 # allow_origins=["*"] と allow_credentials=True の併用はブラウザ仕様上
 # 無効な組み合わせ。本アプリは Cookie 等の資格情報を用いない（同一オリジン配信）ため、
 # allow_credentials=False とし、設定を仕様準拠の正しい状態にする（実挙動は不変）。
+# CORS: どのサイトからこのAPIを呼べるかの設定。
+# 本番と開発用だけを許可する（環境変数 EXTRA_ORIGINS でカンマ区切りで追加できる）。
+ALLOWED_ORIGINS = [
+    "https://minsta-2h19.onrender.com",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+] + [o for o in os.environ.get("EXTRA_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -994,8 +1187,8 @@ def _legal_page(title: str, body_html: str) -> str:
     )
 
 
-TERMS_BODY_HTML = '<p>本利用規約（以下「本規約」といいます）は、森の主 OH-GY（以下「運営者」といいます）が提供する学習記録共有サービス「みんスタ」（以下「本サービス」といいます）の利用条件を定めるものです。本サービスを利用するすべての方（以下「ユーザー」といいます）は、本規約に同意のうえ、本サービスを利用するものとします。</p>\n<h2>第1条（本サービスの内容）</h2>\n<p>1. 本サービスは、ユーザーが学習の記録を行い、同じ目標を持つ他のユーザーと少人数のチームを組んで、互いの学習状況を共有しながら学習の継続を支援することを目的としたサービスです。</p>\n<p>2. 本サービスには、ユーザーのチームを構成するために、運営者が用意したAIによる仮想のメンバー（以下「AIメンバー」といいます）が含まれる場合があります。詳細は第7条に定めます。</p>\n<p>3. 本サービスは現在、開発中のベータ版（試験提供）です。ユーザーは、本サービスが完成された製品ではなく、不具合・仕様変更・データの消失等が生じうることを理解したうえで利用するものとします。</p>\n<p>4. 運営者は、本サービスの内容を、ユーザーへの事前の通知なく変更・追加・廃止することがあります。</p>\n<h2>第2条（ベータ版であること・データの取り扱い）</h2>\n<p>1. 本サービスはベータ版であるため、運営者は、開発・保守・障害対応・仕様変更等にともない、ユーザーの学習記録その他のデータの全部または一部を、事前の予告なく変更・初期化・削除する場合があります。</p>\n<p>2. ユーザーは、本サービスに記録したデータが永続的に保存されることを保証されないことを、あらかじめ承諾するものとします。重要な記録は、ユーザー自身で別途控えを保管することを推奨します。</p>\n<p>3. データの消失・破損によってユーザーに生じた損害について、運営者は第10条の定めに従い責任を負いません。</p>\n<h2>第3条（利用条件・本規約への同意）</h2>\n<p>1. ユーザーは、本規約に同意した時点で、本サービスを利用できるものとします。</p>\n<p>2. ユーザーが本サービスの新規登録を行う際、または本サービスを実際に利用した時点で、ユーザーは本規約およびプライバシーポリシーの内容を確認し、これらに同意したものとみなされます。</p>\n<p>3. 運営者は、新規登録画面において、本規約およびプライバシーポリシーに同意する旨の明示的な意思表示（チェックボックスへのチェック等）を求めることがあります。この場合、ユーザーは、当該意思表示を行うことで本規約に同意したものとします。</p>\n<p>4. 未成年者が本サービスを利用する場合は、親権者など法定代理人の同意を得たうえで利用するものとします。運営者は、未成年者による利用について、当該同意があったものとして取り扱うことができます。</p>\n<h2>第4条（アカウントの登録・管理）</h2>\n<p>1. ユーザーは、本サービスの利用にあたり、メールアドレス、パスワード、ニックネーム等の必要な情報を、正確かつ最新の内容で登録するものとします。</p>\n<p>2. ユーザーは、登録したパスワードおよびアカウントを、自己の責任において適切に管理するものとし、第三者に利用させ、または貸与・譲渡してはなりません。</p>\n<p>3. パスワードの管理不十分、入力の誤り、第三者の使用等によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<p>4. ニックネームは他のユーザーに表示される場合があります。ユーザーは、本名その他自己を特定できる情報をニックネームに用いないことを推奨されます。</p>\n<h2>第5条（学習記録・投稿内容の取り扱い）</h2>\n<p>1. ユーザーが本サービスに投稿した学習記録、メッセージ、その他の情報（以下「投稿内容」といいます）は、同じチームのユーザー等、本サービスの仕様に応じた範囲で、他のユーザーに表示される場合があります。</p>\n<p>2. 投稿内容に関する責任は、投稿したユーザーが負うものとします。</p>\n<p>3. 投稿内容の著作権は、ユーザーに留保されます。ただし、ユーザーは運営者に対し、本サービスの提供・維持・改善・品質向上・不具合対応のために必要な範囲で、投稿内容を無償かつ非独占的に利用（複製・保存・集計・分析・表示等）する権利を許諾するものとします。</p>\n<p>4. 運営者は、投稿内容を含む本サービスの利用状況を統計的に集計・分析し、個人を特定できない形に加工したうえで、本サービスの紹介、研究、学業上の発表、就職活動その他の目的で、その分析結果を利用・公表することができるものとします。この場合においても、個人を特定できる情報を公表することはありません。</p>\n<p>5. 個人情報の取り扱いについては、別途定めるプライバシーポリシーによります。</p>\n<h2>第6条（禁止事項）</h2>\n<p>ユーザーは、本サービスの利用にあたり、次の行為をしてはなりません。</p>\n<p>(1) 法令または公序良俗に違反する行為</p>\n<p>(2) 他のユーザーまたは第三者の権利・名誉・プライバシーを侵害する行為</p>\n<p>(3) 他のユーザーまたは第三者を誹謗中傷し、不快にさせ、または迷惑をかける行為</p>\n<p>(4) わいせつ、暴力的、差別的その他不適切な内容を、ニックネームや投稿内容に用いる行為</p>\n<p>(5) 虚偽の情報を登録または投稿する行為</p>\n<p>(6) 本サービスの運営を妨害する行為、サーバーやネットワークに過度の負荷をかける行為</p>\n<p>(7) 不正アクセス、その他本サービスのセキュリティを脅かす行為</p>\n<p>(8) 本サービスを、本来の目的（学習の記録・継続支援）以外に利用する行為</p>\n<p>(9) 自動化された手段により本サービスに大量のデータを送信し、または情報を取得する行為</p>\n<p>(10) その他、運営者が不適切と判断する行為</p>\n<h2>第7条（利用の制限・登録の抹消）</h2>\n<p>1. 運営者は、ユーザーが本規約に違反した場合、または違反するおそれがあると判断した場合、事前の通知なく、投稿内容の削除、ニックネームの変更、利用の一時停止、アカウントの削除等の措置を行うことができます。</p>\n<p>2. 前項の措置によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<p>3. 本サービスには、一定期間学習の記録がないユーザーを、自動的にチームから離脱させる仕組みがあります。この仕組みの詳細・基準は、運営者が定め、予告なく変更することがあります。当該離脱によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<h2>第8条（AIメンバーについて）</h2>\n<p>1. 本サービスでは、チームの人数を補うため、運営者が用意したAIメンバーがチームに参加することがあります。AIメンバーは実在の人物ではありません。</p>\n<p>2. チームの構成や人数によっては、ユーザーのチームのメンバーが、AIメンバーのみとなる場合があります。</p>\n<p>3. AIメンバーの発言・反応は自動的に生成されるものであり、その内容の正確性・適切性について運営者は保証せず、責任を負いません。</p>\n<h2>第9条（料金）</h2>\n<p>1. 本サービスは、現在、無料で提供されています。</p>\n<p>2. 運営者は、将来、本サービスの一部の機能を有料で提供することがあります。その場合の料金・支払方法・その他の条件は、別途定め、事前にユーザーに通知します。</p>\n<h2>第10条（サービスの中断・停止・終了）</h2>\n<p>1. 運営者は、次の場合に、ユーザーへの事前の通知なく、本サービスの全部または一部を中断・停止することができます。</p>\n<p>(1) システムの保守・点検・更新を行う場合</p>\n<p>(2) 火災・停電・天災等の不可抗力により、本サービスの提供が困難な場合</p>\n<p>(3) 利用しているサーバー、ネットワーク、外部サービス等に障害が生じた場合</p>\n<p>(4) その他、運営者が必要と判断した場合</p>\n<p>2. 運営者は、本サービスを終了する場合、合理的な方法でユーザーに通知するよう努めます。ただし、ベータ版であることまたは緊急やむを得ない事情がある場合は、事前の通知なく終了することができます。</p>\n<p>3. 本サービスの中断・停止・終了によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<h2>第11条（免責事項）</h2>\n<p>1. 本サービスは、個人により、ベータ版として運営されています。運営者は、本サービスの内容・機能・データの保存等について、完全性・正確性・有用性・継続性・特定目的への適合性を、明示・黙示を問わず保証するものではありません。</p>\n<p>2. 運営者は、本サービスの利用または利用できなかったことによってユーザーに生じた損害（不具合、データの消失・破損、サービスの中断・終了、チームからの自動離脱等を含みます）について、責任を負いません。ただし、運営者の故意または重過失による場合は、この限りではありません。</p>\n<p>3. 前項ただし書きにより運営者が責任を負う場合であっても、その賠償の範囲は、現実に発生した通常かつ直接の損害に限り、本サービスが無償で提供されていることに鑑み、適切な範囲に限られるものとします。</p>\n<p>4. ユーザー間またはユーザーと第三者との間で生じた紛争について、運営者は責任を負いません。ユーザーは、自己の責任と費用において当該紛争を解決するものとします。</p>\n<h2>第12条（本規約の変更）</h2>\n<p>1. 運営者は、必要と判断した場合、本規約を変更することができます。重要な変更を行う場合は、合理的な方法でユーザーに通知または本サービス上に表示します。</p>\n<p>2. 変更後の本規約は、本サービス上に表示された時点から効力を生じるものとします。変更後にユーザーが本サービスを利用した場合、変更後の本規約に同意したものとみなされます。</p>\n<h2>第13条（準拠法・管轄）</h2>\n<p>1. 本規約の解釈・適用は、日本法を準拠法とします。</p>\n<p>2. 本サービスに関して運営者とユーザーとの間で紛争が生じた場合には、運営者の所在地を管轄する裁判所を、第一審の専属的合意管轄裁判所とします。</p>\n<h2>第14条（お問い合わせ・運営者）</h2>\n<p>本サービスの運営者、および本規約に関するお問い合わせ先は、以下のとおりです。</p>\n<p>運営者：森の主 OH-GY</p>\n<p>連絡先：ohgy.dev@gmail.com</p>\n<p>制定日：2026年6月27日</p>\n<p>以上</p>'
-PRIVACY_BODY_HTML = '<p>森の主 OH-GY（以下「運営者」といいます）は、学習記録共有サービス「みんスタ」（以下「本サービス」といいます）におけるユーザーの個人情報・データの取り扱いについて、以下のとおりプライバシーポリシー（以下「本ポリシー」といいます）を定めます。本サービスはベータ版（試験提供）です。</p>\n<h2>第1条（取得する情報）</h2>\n<p>運営者は、本サービスの提供にあたり、次の情報を取得します。</p>\n<p>(1) ユーザーが登録時・利用時に入力する情報</p>\n<p>・メールアドレス</p>\n<p>・パスワード（後述のとおり、暗号化（ハッシュ化）して保存します）</p>\n<p>・ニックネーム</p>\n<p>・学習の目標、目標日</p>\n<p>・プロフィール画像（ユーザーが設定した場合）</p>\n<p>(2) ユーザーが本サービスの利用にともない生成する情報</p>\n<p>・学習記録（学習内容、学習時間、記録日時など）</p>\n<p>・登録した参考書等の情報</p>\n<p>・その日ごとの目標（宣言）などの情報</p>\n<p>・チーム内で送信したメッセージ、リアクション</p>\n<p>・チームへの所属状況、学習の継続状況など</p>\n<p>(3) サービスの提供に必要な技術的な情報</p>\n<p>・本サービスの動作・通信に必要な範囲の情報</p>\n<p>・プッシュ通知の送信に必要な購読情報（ユーザーが通知を有効にした場合）</p>\n<h2>第2条（利用目的）</h2>\n<p>運営者は、取得した情報を、次の目的のために利用します。</p>\n<p>(1) 本サービスの提供・維持・運営のため</p>\n<p>(2) ユーザーのチーム編成、学習記録の表示、チーム内での共有など、本サービスの機能を提供するため</p>\n<p>(3) ユーザーが有効にした場合に、学習を促すプッシュ通知を送信するため</p>\n<p>(4) 本サービスの不具合対応、安全性の確保、不正利用の防止のため</p>\n<p>(5) 本サービスの改善・品質向上のため</p>\n<p>(6) 本サービスの利用状況を統計的に分析し、個人を特定できない形に加工したうえで、本サービスの紹介・研究・学業上の発表・就職活動等に利用するため</p>\n<p>(7) ユーザーからのお問い合わせに対応するため</p>\n<p>(8) その他、上記に付随する目的のため</p>\n<h2>第3条（統計データ・匿名加工情報の利用）</h2>\n<p>1. 運営者は、取得した情報を統計的に集計・分析し、特定の個人を識別できないように加工した情報（以下「統計データ」といいます）を作成することがあります。</p>\n<p>2. 運営者は、統計データを、本サービスの紹介・改善、研究、学業上の発表、就職活動その他の目的で、利用・公表することができます。統計データには、特定の個人を識別できる情報（メールアドレス、ニックネーム等）は含めません。</p>\n<h2>第4条（パスワードの取り扱い）</h2>\n<p>ユーザーのパスワードは、暗号化（ハッシュ化）した状態で保存します。運営者は、ユーザーの生のパスワードを保持しません。</p>\n<h2>第5条（情報の共有・第三者への提供）</h2>\n<p>1. ユーザーが本サービスに入力・投稿した情報のうち、ニックネーム、学習記録、メッセージ等は、本サービスの仕様に応じて、同じチームのユーザー等、他のユーザーに表示される場合があります。メールアドレスやパスワードが他のユーザーに表示されることはありません。</p>\n<p>2. 運営者は、次の場合を除き、ユーザーの個人情報を第三者に提供しません。</p>\n<p>(1) ユーザーの同意がある場合</p>\n<p>(2) 法令に基づき開示が必要な場合</p>\n<p>(3) 人の生命・身体・財産の保護のために必要であり、本人の同意を得ることが困難な場合</p>\n<h2>第6条（外部サービスの利用）</h2>\n<p>1. 本サービスは、参考書等の書籍情報の検索機能のため、Google LLCが提供する「Google Books API」を利用しています。ユーザーが書籍を検索する際、入力された検索語句が同社に送信され、検索結果として書籍情報を取得します。同社における情報の取り扱いは、同社の定めるプライバシーポリシー（https://policies.google.com/privacy 等）によります。</p>\n<p>2. 本サービスは、その他の機能のため、外部のサービス（API等）を利用することがあります。その際、機能の提供に必要な範囲の情報が外部サービスに送信される場合があります。</p>\n<p>3. 本サービスは、サーバー・データベース等のために、外部のホスティング事業者のサービスを利用しています。ユーザーのデータは、当該事業者のサーバー上に保存されます。</p>\n<p>4. 本サービスのプッシュ通知は、ブラウザおよびOSの提供する配信の仕組みを通じて送信されます。</p>\n<p>5. 本サービスは、第三者によるアクセス解析ツールおよび第三者の広告サービスを使用していません。</p>\n<h2>第7条（情報の管理・保護）</h2>\n<p>運営者は、取得した情報の漏えい・滅失・毀損の防止その他の安全管理のために、必要かつ適切な措置を講じるよう努めます。ただし、本サービスは個人によりベータ版として運営されており、運営者は情報の安全性について完全性を保証するものではありません。</p>\n<h2>第8条（情報の保存期間・削除）</h2>\n<p>1. 運営者は、利用目的の達成に必要な範囲で、ユーザーの情報を保存します。</p>\n<p>2. 本サービスはベータ版であるため、運営者は、開発・保守等にともない、ユーザーの情報の全部または一部を、事前の予告なく削除・初期化する場合があります。</p>\n<p>3. ユーザーが退会（アカウントの削除）を行った場合、運営者は、ユーザーの個人を特定できる情報（メールアドレス、ニックネーム等）を、運営上必要な期間内に削除または個人を特定できない形に加工します。ただし、不具合対応・不正利用の防止・バックアップ等のため、一定期間これらの情報を保持することがあります。</p>\n<p>4. 前項にかかわらず、個人を特定できない形に加工された統計データは、退会後も保持・利用されることがあります。</p>\n<p>5. ユーザーは、自己の情報の開示・訂正・削除等を希望する場合、第9条のお問い合わせ先に連絡することができます。運営者は、本人からの請求であることを確認のうえ、法令に従い、合理的な範囲で対応します。</p>\n<h2>第9条（お問い合わせ先）</h2>\n<p>本ポリシーに関するお問い合わせ、および個人情報の取り扱いに関するご請求は、以下までご連絡ください。</p>\n<p>運営者：森の主 OH-GY</p>\n<p>連絡先：ohgy.dev@gmail.com</p>\n<h2>第10条（本ポリシーの変更）</h2>\n<p>1. 運営者は、必要と判断した場合、本ポリシーを変更することがあります。</p>\n<p>2. 変更後の本ポリシーは、本サービス上に表示された時点から効力を生じるものとします。</p>\n<p>制定日：2026年6月27日</p>\n<p>以上</p>'
+TERMS_BODY_HTML = '<p>本利用規約（以下「本規約」といいます）は、森の主 OH-GY（以下「運営者」といいます）が提供する学習記録共有サービス「みんスタ」（以下「本サービス」といいます）の利用条件を定めるものです。本サービスを利用するすべての方（以下「ユーザー」といいます）は、本規約に同意のうえ、本サービスを利用するものとします。</p>\n<h2>第1条（本サービスの内容）</h2>\n<p>1. 本サービスは、ユーザーが学習の記録を行い、同じ目標を持つ他のユーザーと少人数のチームを組んで、互いの学習状況を共有しながら学習の継続を支援することを目的としたサービスです。</p>\n<p>2. 本サービスには、ユーザーのチームを構成するために、運営者が用意したAIによる仮想のメンバー（以下「AIメンバー」といいます）が含まれる場合があります。詳細は第8条に定めます。</p>\n<p>3. 本サービスは現在、開発中のベータ版（試験提供）です。ユーザーは、本サービスが完成された製品ではなく、不具合・仕様変更・データの消失等が生じうることを理解したうえで利用するものとします。</p>\n<p>4. 運営者は、本サービスの内容を、ユーザーへの事前の通知なく変更・追加・廃止することがあります。</p>\n<p>5. ユーザーは、塾・学校・サークル等（以下「コミュニティ」といいます）が発行するコードを入力することで、そのコミュニティに所属できます。所属したユーザーのチームは、同じコミュニティに所属するユーザーの中から編成されます。ユーザーは、いつでもコミュニティへの所属を解除できます。</p>\n<h2>第2条（ベータ版であること・データの取り扱い）</h2>\n<p>1. 本サービスはベータ版であるため、運営者は、開発・保守・障害対応・仕様変更等にともない、ユーザーの学習記録その他のデータの全部または一部を、事前の予告なく変更・初期化・削除する場合があります。</p>\n<p>2. ユーザーは、本サービスに記録したデータが永続的に保存されることを保証されないことを、あらかじめ承諾するものとします。重要な記録は、ユーザー自身で別途控えを保管することを推奨します。</p>\n<p>3. データの消失・破損によってユーザーに生じた損害について、運営者は第11条の定めに従い責任を負いません。</p>\n<h2>第3条（利用条件・本規約への同意）</h2>\n<p>1. ユーザーは、本規約に同意した時点で、本サービスを利用できるものとします。</p>\n<p>2. ユーザーが本サービスの新規登録を行う際、または本サービスを実際に利用した時点で、ユーザーは本規約およびプライバシーポリシーの内容を確認し、これらに同意したものとみなされます。</p>\n<p>3. 運営者は、新規登録画面において、本規約およびプライバシーポリシーに同意する旨の明示的な意思表示（チェックボックスへのチェック等）を求めることがあります。この場合、ユーザーは、当該意思表示を行うことで本規約に同意したものとします。</p>\n<p>4. 未成年者が本サービスを利用する場合は、親権者など法定代理人の同意を得たうえで利用するものとします。運営者は、未成年者による利用について、当該同意があったものとして取り扱うことができます。</p>\n<h2>第4条（アカウントの登録・管理・退会）</h2>\n<p>1. ユーザーは、本サービスの利用にあたり、メールアドレス、パスワード、ニックネーム等の必要な情報を、正確かつ最新の内容で登録するものとします。パスワードは8文字以上とします。</p>\n<p>2. ユーザーは、登録したパスワードおよびアカウントを、自己の責任において適切に管理するものとし、第三者に利用させ、または貸与・譲渡してはなりません。</p>\n<p>3. パスワードの管理不十分、入力の誤り、第三者の使用等によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<p>4. ニックネームは他のユーザーに表示される場合があります。ユーザーは、本名その他自己を特定できる情報をニックネームに用いないことを推奨されます。</p>\n<p>5. ログインの状態は、ログインした時点から60日が経過すると解除されます。複数の端末で同時にログインすることができ、ログアウトはその端末についてのみ行われます。</p>\n<p>6. 運営者は、不正なログインを防ぐため、一定時間内にログインの失敗が続いた場合、一時的にログインを受け付けないことがあります。</p>\n<p>7. ユーザーは、設定画面から、いつでも退会（アカウントの削除）することができます。退会すると、ユーザーの学習記録、参考書、投稿その他の情報は削除され、元に戻すことはできません。</p>\n<h2>第5条（学習記録・投稿内容の取り扱い）</h2>\n<p>1. ユーザーが本サービスに投稿した学習記録、メッセージ、その他の情報（以下「投稿内容」といいます）は、同じチームのユーザー等、本サービスの仕様に応じた範囲で、他のユーザーに表示される場合があります。</p>\n<p>2. 投稿内容に関する責任は、投稿したユーザーが負うものとします。</p>\n<p>3. 投稿内容の著作権は、ユーザーに留保されます。ただし、ユーザーは運営者に対し、本サービスの提供・維持・改善・品質向上・不具合対応のために必要な範囲で、投稿内容を無償かつ非独占的に利用（複製・保存・集計・分析・表示等）する権利を許諾するものとします。</p>\n<p>4. 運営者は、投稿内容を含む本サービスの利用状況を統計的に集計・分析し、個人を特定できない形に加工したうえで、本サービスの紹介、研究、学業上の発表、就職活動その他の目的で、その分析結果を利用・公表することができるものとします。この場合においても、個人を特定できる情報を公表することはありません。</p>\n<p>5. 個人情報の取り扱いについては、別途定めるプライバシーポリシーによります。</p>\n<p>6. ユーザーがコミュニティに所属した場合でも、運営者は、ユーザーの情報をコミュニティの運営者（塾の先生等）に提供しません。将来、コミュニティの運営者がユーザーの学習状況を閲覧できる機能を提供する場合は、共有する項目を示したうえで、ユーザー（16歳未満の場合はその法定代理人）の同意を得てから開始します。</p>\n<h2>第6条（禁止事項）</h2>\n<p>ユーザーは、本サービスの利用にあたり、次の行為をしてはなりません。</p>\n<p>(1) 法令または公序良俗に違反する行為</p>\n<p>(2) 他のユーザーまたは第三者の権利・名誉・プライバシーを侵害する行為</p>\n<p>(3) 他のユーザーまたは第三者を誹謗中傷し、不快にさせ、または迷惑をかける行為</p>\n<p>(4) わいせつ、暴力的、差別的その他不適切な内容を、ニックネームや投稿内容に用いる行為</p>\n<p>(5) 虚偽の情報を登録または投稿する行為</p>\n<p>(6) 本サービスの運営を妨害する行為、サーバーやネットワークに過度の負荷をかける行為</p>\n<p>(7) 不正アクセス、その他本サービスのセキュリティを脅かす行為</p>\n<p>(8) 本サービスを、本来の目的（学習の記録・継続支援）以外に利用する行為</p>\n<p>(9) 自動化された手段により本サービスに大量のデータを送信し、または情報を取得する行為</p>\n<p>(10) その他、運営者が不適切と判断する行為</p>\n<h2>第7条（利用の制限・チームからの離脱）</h2>\n<p>1. 運営者は、ユーザーが本規約に違反した場合、または違反するおそれがあると判断した場合、事前の通知なく、投稿内容の削除、ニックネームの変更、利用の一時停止、アカウントの削除等の措置を行うことができます。</p>\n<p>2. 前項の措置によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<p>3. 本サービスでは、3日間連続で学習の記録がないユーザーは、チームの席を空けるため、自動的にチームから離脱します。離脱しても学習記録は消えず、ユーザーはいつでもチームに再参加できます。運営者は、この基準を変更する場合、事前に本サービス上で告知します。</p>\n<h2>第8条（AIメンバーについて）</h2>\n<p>1. 本サービスでは、チームの人数を補うため、運営者が用意したAIメンバーがチームに参加することがあります。AIメンバーは実在の人物ではありません。</p>\n<p>2. チームの構成や人数によっては、ユーザー以外のチームのメンバーが、AIメンバーのみとなる場合があります。</p>\n<p>3. AIメンバーの発言・反応は自動的に生成されるものであり、その内容の正確性・適切性について運営者は保証せず、責任を負いません。</p>\n<h2>第9条（料金）</h2>\n<p>1. 本サービスは、現在、無料で提供されています。</p>\n<p>2. 運営者は、将来、本サービスの一部の機能を有料で提供することがあります。その場合の料金・支払方法・その他の条件は、別途定め、事前にユーザーに通知します。</p>\n<h2>第10条（サービスの中断・停止・終了）</h2>\n<p>1. 運営者は、次の場合に、ユーザーへの事前の通知なく、本サービスの全部または一部を中断・停止することができます。</p>\n<p>(1) システムの保守・点検・更新を行う場合</p>\n<p>(2) 火災・停電・天災等の不可抗力により、本サービスの提供が困難な場合</p>\n<p>(3) 利用しているサーバー、ネットワーク、外部サービス等に障害が生じた場合</p>\n<p>(4) その他、運営者が必要と判断した場合</p>\n<p>2. 運営者は、本サービスを終了する場合、合理的な方法でユーザーに通知するよう努めます。ただし、ベータ版であることまたは緊急やむを得ない事情がある場合は、事前の通知なく終了することができます。</p>\n<p>3. 本サービスの中断・停止・終了によってユーザーに生じた損害について、運営者は責任を負いません。</p>\n<h2>第11条（免責事項）</h2>\n<p>1. 本サービスは、個人により、ベータ版として運営されています。運営者は、本サービスの内容・機能・データの保存等について、完全性・正確性・有用性・継続性・特定目的への適合性を、明示・黙示を問わず保証するものではありません。</p>\n<p>2. 運営者は、本サービスの利用または利用できなかったことによってユーザーに生じた損害（不具合、データの消失・破損、サービスの中断・終了、チームからの自動離脱等を含みます）について、責任を負いません。ただし、運営者の故意または重過失による場合は、この限りではありません。</p>\n<p>3. 前項ただし書きにより運営者が責任を負う場合であっても、その賠償の範囲は、現実に発生した通常かつ直接の損害に限り、本サービスが無償で提供されていることに鑑み、適切な範囲に限られるものとします。</p>\n<p>4. ユーザー間またはユーザーと第三者との間で生じた紛争について、運営者は責任を負いません。ユーザーは、自己の責任と費用において当該紛争を解決するものとします。</p>\n<h2>第12条（本規約の変更）</h2>\n<p>1. 運営者は、必要と判断した場合、本規約を変更することができます。重要な変更を行う場合は、合理的な方法でユーザーに通知または本サービス上に表示します。</p>\n<p>2. 変更後の本規約は、本サービス上に表示された時点から効力を生じるものとします。変更後にユーザーが本サービスを利用した場合、変更後の本規約に同意したものとみなされます。</p>\n<h2>第13条（準拠法・管轄）</h2>\n<p>1. 本規約の解釈・適用は、日本法を準拠法とします。</p>\n<p>2. 本サービスに関して運営者とユーザーとの間で紛争が生じた場合には、運営者の所在地を管轄する裁判所を、第一審の専属的合意管轄裁判所とします。</p>\n<h2>第14条（お問い合わせ・運営者）</h2>\n<p>本サービスの運営者、および本規約に関するお問い合わせ先は、以下のとおりです。</p>\n<p>運営者：森の主 OH-GY</p>\n<p>連絡先：ohgy.dev@gmail.com</p>\n<p>制定日：2026年6月27日</p>\n<p>改定日：2026年9月21日</p>\n<p>以上</p>'
+PRIVACY_BODY_HTML = '<p>森の主 OH-GY（以下「運営者」といいます）は、学習記録共有サービス「みんスタ」（以下「本サービス」といいます）におけるユーザーの個人情報・データの取り扱いについて、以下のとおりプライバシーポリシー（以下「本ポリシー」といいます）を定めます。本サービスはベータ版（試験提供）です。</p>\n<h2>第1条（取得する情報）</h2>\n<p>運営者は、本サービスの提供にあたり、次の情報を取得します。</p>\n<p>(1) ユーザーが登録時・利用時に入力する情報</p>\n<p>・メールアドレス</p>\n<p>・パスワード（第4条のとおり、元に戻せない形に変換（ハッシュ化）して保存します）</p>\n<p>・ニックネーム</p>\n<p>・学習の目標、目標日</p>\n<p>・プロフィール画像（ユーザーが設定した場合）</p>\n<p>・所属するコミュニティ（ユーザーがコミュニティのコードを入力した場合）</p>\n<p>(2) ユーザーが本サービスの利用にともない生成する情報</p>\n<p>・学習記録（学習内容、学習時間、記録日時など）</p>\n<p>・登録した参考書等の情報</p>\n<p>・その日ごとの目標（宣言）などの情報</p>\n<p>・チーム内で送信したメッセージ、リアクション</p>\n<p>・チームへの所属状況、学習の継続状況など</p>\n<p>(3) サービスの提供に必要な技術的な情報</p>\n<p>・ログインの状態を保つための情報（ハッシュ化したトークンと有効期限）</p>\n<p>・ログインの試行を制限するための情報（IPアドレスとメールアドレス。ログインに失敗した場合に限り、サーバーのメモリ上に最大15分間保持し、データベースには保存しません）</p>\n<p>・プッシュ通知の送信に必要な購読情報（ユーザーが通知を有効にした場合）</p>\n<p>・25分集中の終了を知らせる通知の予約（ユーザーが25分集中を開始した場合）</p>\n<p>(4) ユーザーの端末内に保存する情報</p>\n<p>本サービスは、次の情報をユーザーの端末（ブラウザ）内に保存します。このうち、ログインの状態を示す情報以外は、運営者に送信されません。</p>\n<p>・ログインの状態を示す情報\u3000・表示の設定（ダークテーマ等）\u3000・計測中のタイマーの状態\u3000・案内を表示したかどうかの記録</p>\n<h2>第2条（利用目的）</h2>\n<p>運営者は、取得した情報を、次の目的のために利用します。</p>\n<p>(1) 本サービスの提供・維持・運営のため</p>\n<p>(2) ユーザーのチーム編成、学習記録の表示、チーム内での共有など、本サービスの機能を提供するため</p>\n<p>(3) ユーザーが有効にした場合に、学習を促すプッシュ通知や、25分集中の終了の通知を送信するため</p>\n<p>(4) 本サービスの不具合対応、安全性の確保、不正なログインや不正利用の防止のため</p>\n<p>(5) 本サービスの改善・品質向上のため</p>\n<p>(6) 本サービスの利用状況を統計的に分析し、個人を特定できない形に加工したうえで、本サービスの紹介・研究・学業上の発表・就職活動等に利用するため</p>\n<p>(7) ユーザーからのお問い合わせに対応するため</p>\n<p>(8) その他、上記に付随する目的のため</p>\n<h2>第3条（統計データ・匿名加工情報の利用）</h2>\n<p>1. 運営者は、取得した情報を統計的に集計・分析し、特定の個人を識別できないように加工した情報（以下「統計データ」といいます）を作成することがあります。</p>\n<p>2. 運営者は、統計データを、本サービスの紹介・改善、研究、学業上の発表、就職活動その他の目的で、利用・公表することができます。統計データには、特定の個人を識別できる情報（メールアドレス、ニックネーム等）は含めません。</p>\n<h2>第4条（パスワード・ログイン情報の取り扱い）</h2>\n<p>1. ユーザーのパスワードは、元に戻せない形に変換（ハッシュ化）した状態で保存します。運営者は、ユーザーの生のパスワードを保持しません。</p>\n<p>2. ログインの状態を保つためのトークンも、ハッシュ化した状態で保存し、発行から60日で失効させます。</p>\n<h2>第5条（情報の共有・第三者への提供）</h2>\n<p>1. ユーザーが本サービスに入力・投稿した情報のうち、ニックネーム、学習記録、メッセージ等は、本サービスの仕様に応じて、同じチームのユーザー等、他のユーザーに表示される場合があります。メールアドレスやパスワードが他のユーザーに表示されることはありません。</p>\n<p>2. 運営者は、次の場合を除き、ユーザーの個人情報を第三者に提供しません。</p>\n<p>(1) ユーザーの同意がある場合</p>\n<p>(2) 法令に基づき開示が必要な場合</p>\n<p>(3) 人の生命・身体・財産の保護のために必要であり、本人の同意を得ることが困難な場合</p>\n<p>3. ユーザーがコミュニティに所属した場合でも、運営者は、ユーザーの情報をコミュニティの運営者（塾の先生等）に提供しません。所属によって変わるのは、チームを編成する範囲だけです。将来、コミュニティの運営者がユーザーの学習状況を閲覧できる機能を提供する場合は、共有する項目と共有しない項目を示したうえで、ユーザー（16歳未満の場合はその法定代理人）の同意を得てから開始します。</p>\n<h2>第6条（外部サービスの利用）</h2>\n<p>1. 本サービスは、参考書等の書籍情報の検索機能のため、Google LLCが提供する「Google Books API」を利用しています。ユーザーが書籍を検索する際、入力された検索語句が同社に送信され、検索結果として書籍情報を取得します。同社における情報の取り扱いは、同社の定めるプライバシーポリシー（https://policies.google.com/privacy 等）によります。</p>\n<p>2. 本サービスの画面は、表示に使う文字（Google LLCの「Google Fonts」）、グラフの描画に使うプログラム（jsDelivrが配信する「Chart.js」）、環境音（mixkit および Wikimedia Commons が配信する音声ファイル）を、ユーザーの端末から直接読み込みます。その際、ユーザーのIPアドレスやブラウザの情報が、それぞれの提供元に送信されます。</p>\n<p>3. 本サービスのサーバーおよびデータベースは、米国の事業者であるRender（https://render.com）が提供するサービスを利用しています。ユーザーのデータは、同社のサーバー上に保存されます。</p>\n<p>4. 本サービスのプッシュ通知は、ブラウザおよびOSの提供する配信の仕組みを通じて送信されます。</p>\n<p>5. 本サービスは、第三者によるアクセス解析ツールおよび第三者の広告サービスを使用していません。</p>\n<h2>第7条（情報の管理・保護）</h2>\n<p>運営者は、取得した情報の漏えい・滅失・毀損の防止その他の安全管理のために、必要かつ適切な措置を講じるよう努めます。ただし、本サービスは個人によりベータ版として運営されており、運営者は情報の安全性について完全性を保証するものではありません。</p>\n<h2>第8条（情報の保存期間・削除）</h2>\n<p>1. 運営者は、利用目的の達成に必要な範囲で、ユーザーの情報を保存します。主な情報の保存期間は次のとおりです。</p>\n<p>・ログインの状態：発行から60日で失効し、削除します</p>\n<p>・ログインの試行の記録：最大15分間（サーバーのメモリ上のみ）</p>\n<p>・その日ごとの目標（宣言）：30日を過ぎたものを自動で削除します</p>\n<p>・25分集中の終了通知の予約：通知した時点、または取り消した時点で削除します</p>\n<p>2. 本サービスはベータ版であるため、運営者は、開発・保守等にともない、ユーザーの情報の全部または一部を、事前の予告なく削除・初期化する場合があります。</p>\n<p>3. ユーザーは、設定画面から、いつでも退会（アカウントの削除）することができます。退会すると、運営者は、アカウント、学習記録、参考書、その日ごとの目標、メッセージ、リアクション（ユーザーのメッセージに他のユーザーが付けたものを含みます）、プッシュ通知の購読情報、通知の予約、ログインの状態を、直ちに削除します。ただし、障害に備えた控え（バックアップ）等に、一定期間残る場合があります。</p>\n<p>4. 前項にかかわらず、個人を特定できない形に加工された統計データは、退会後も保持・利用されることがあります。</p>\n<p>5. ユーザーは、自己の情報の開示・訂正・削除等を希望する場合、第10条のお問い合わせ先に連絡することができます。運営者は、本人からの請求であることを確認のうえ、法令に従い、合理的な範囲で対応します。</p>\n<h2>第9条（未成年のユーザー）</h2>\n<p>1. 未成年のユーザーは、親権者など法定代理人の同意を得たうえで、本サービスを利用してください（利用規約第3条）。</p>\n<p>2. 16歳未満のユーザー本人またはその法定代理人は、前条第5項の方法により、ユーザーの情報の削除等を請求することができます。</p>\n<h2>第10条（お問い合わせ先）</h2>\n<p>本ポリシーに関するお問い合わせ、および個人情報の取り扱いに関するご請求は、以下までご連絡ください。</p>\n<p>運営者：森の主 OH-GY</p>\n<p>連絡先：ohgy.dev@gmail.com</p>\n<h2>第11条（本ポリシーの変更）</h2>\n<p>1. 運営者は、必要と判断した場合、本ポリシーを変更することがあります。重要な変更を行う場合は、本サービス上で告知します。</p>\n<p>2. 変更後の本ポリシーは、本サービス上に表示された時点から効力を生じるものとします。</p>\n<p>制定日：2026年6月27日</p>\n<p>改定日：2026年9月21日</p>\n<p>以上</p>'
 
 
 @app.get("/terms")
@@ -1008,9 +1201,70 @@ def get_privacy():
     return HTMLResponse(_legal_page("プライバシーポリシー", PRIVACY_BODY_HTML))
 
 
-SW_JS = """self.addEventListener('install', function (event) { self.skipWaiting(); });
-self.addEventListener('activate', function (event) { event.waitUntil(self.clients.claim()); });
-self.addEventListener('fetch', function (event) { });
+SW_JS = r"""// キャッシュの名前。アプリを更新したらこの数字を上げる。
+// 名前が変わると古いキャッシュは activate 時に捨てられ、次回アクセスで新しい版を取り直す。
+var CACHE = 'minsta-v1';
+
+self.addEventListener('install', function (event) {
+    // アプリ本体を先に取っておく。失敗してもインストールは止めない（圏外での初回登録など）。
+    event.waitUntil(
+        caches.open(CACHE).then(function (cache) {
+            return cache.addAll(['/', '/manifest.json', '/icon-192.png?v=2']);
+        }).catch(function () { })
+    );
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', function (event) {
+    // 名前が変わった古いキャッシュを削除する。これをしないと更新が反映されない。
+    event.waitUntil(
+        caches.keys().then(function (names) {
+            return Promise.all(names.map(function (n) {
+                return n === CACHE ? null : caches.delete(n);
+            }));
+        }).then(function () { return self.clients.claim(); })
+    );
+});
+
+self.addEventListener('fetch', function (event) {
+    var req = event.request;
+    // 取得だけを扱う。送信(POST等)や外部サイトへの通信には手を出さない。
+    if (req.method !== 'GET') return;
+    if (new URL(req.url).origin !== self.location.origin) return;
+    // APIの応答は毎回新しいものが必要なのでキャッシュしない。
+    if (/\/(users|reports|groups|books|messages|daily-goals|push|pomodoro|api)\//.test(req.url)) return;
+
+    // 画面の読み込みは「まずネット、繋がらなければキャッシュ」。
+    // こうしておくと、更新は普通に反映され、圏外のときだけ保存した版が出る。
+    if (req.mode === 'navigate') {
+        event.respondWith(
+            fetch(req).then(function (res) {
+                var copy = res.clone();
+                caches.open(CACHE).then(function (c) { c.put('/', copy); }).catch(function () { });
+                return res;
+            }).catch(function () {
+                return caches.match('/').then(function (hit) {
+                    return hit || new Response(
+                        '<meta charset="utf-8"><p>オフラインです。通信が戻ると開けます。</p>',
+                        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                    );
+                });
+            })
+        );
+        return;
+    }
+
+    // アイコンなどの部品は「あればキャッシュ、なければネット」。
+    event.respondWith(
+        caches.match(req).then(function (hit) {
+            return hit || fetch(req).then(function (res) {
+                var copy = res.clone();
+                caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () { });
+                return res;
+            });
+        }).catch(function () { return fetch(req); })
+    );
+});
 // push 通知の受信時にシステム通知を表示する
 self.addEventListener('push', function (event) {
     var data = {};
@@ -1036,7 +1290,22 @@ def get_sw():
 
 
 @app.websocket("/ws/{group_id}")
-async def websocket_endpoint(websocket: WebSocket, group_id: int):
+async def websocket_endpoint(websocket: WebSocket, group_id: int, token: str = ""):
+    """チームの更新通知を受け取る接続。
+
+    認証: 接続時にトークンを受け取り、本当にそのグループの一員かを確かめる。
+    確認しないと、グループ番号を順に指定するだけで、他人のチームの
+    活動タイミングを外から覗けてしまう。
+    """
+    db = SessionLocal()
+    try:
+        user = user_from_token(db, token)
+        if not user or user.group_id != group_id:
+            await websocket.close(code=4401)  # 4401: 認証できない
+            return
+    finally:
+        db.close()
+
     await manager.connect(websocket, group_id)
     try:
         while True:
@@ -1060,6 +1329,11 @@ def register(user_data: dict, db: Session = Depends(get_db)):
     # メールアドレスの形式チェック(@ とドメイン部の . の有無)。
     if "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="メールアドレスの形式が正しくありません")
+    # 短すぎるパスワードを弾く（総当たりへの最低限の備え）。
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=400, detail="パスワードは8文字以上にしてください"
+        )
     # bcrypt は72バイトを超えると例外を投げる。事前に検証して 400 を返す。
     if len(password.encode("utf-8")) > 72:
         raise HTTPException(
@@ -1086,7 +1360,6 @@ def register(user_data: dict, db: Session = Depends(get_db)):
             name=name,
             goal=goal,
             target_date=user_data.get("target_date"),
-            auth_token=issue_token(),
             created_at=utcnow(),
         )
         db.add(new_user)
@@ -1115,36 +1388,52 @@ def register(user_data: dict, db: Session = Depends(get_db)):
     # 認証: 発行したトークンを返す。ブラウザはこれを保存し、以降の通信に使う。
     return {
         "user": {"id": new_user.id, "name": new_user.name, "goal": new_user.goal},
-        "token": new_user.auth_token,
+        "token": create_session(db, new_user),
     }
 
 
 @app.post("/users/login")
-def login_user(login_data: dict, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == login_data["email"]).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not bcrypt.checkpw(
-        login_data["password"].encode("utf-8"), user.hashed_password.encode("utf-8")
+def login_user(request: Request, login_data: dict, db: Session = Depends(get_db)):
+    email = (login_data.get("email") or "").strip()
+    password = login_data.get("password") or ""
+    if not email or not password:
+        raise HTTPException(
+            status_code=400, detail="メールアドレスとパスワードを入力してください"
+        )
+
+    # 総当たり対策: 同じ相手からの連続した失敗を制限する。
+    check_login_rate(request, email)
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not bcrypt.checkpw(
+        password.encode("utf-8"), user.hashed_password.encode("utf-8")
     ):
+        record_login_failure(request, email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    # 認証: ログインのたびに新しいトークンを発行する。
-    user.auth_token = issue_token()
-    db.commit()
+
+    # 認証: 端末ごとに新しいセッションを作る（他の端末のログインは維持される）。
+    clear_login_failures(request, email)
+    token = create_session(db, user)
     return {
         "user": {"id": user.id, "name": user.name, "goal": user.goal},
-        "token": user.auth_token,
+        "token": token,
     }
 
 
 # 認証: ログアウト。サーバー側のトークンを無効化する。
 @app.post("/users/logout")
 def logout_user(
+    authorization: Optional[str] = Header(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    current_user.auth_token = None
-    db.commit()
+    # ログアウトした端末のセッションだけを消す。他の端末は維持される。
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[len("Bearer "):]
+        db.query(AuthToken).filter(
+            AuthToken.token_hash == hash_token(token)
+        ).delete(synchronize_session=False)
+        db.commit()
     return {"message": "Logged out"}
 
 
@@ -1367,6 +1656,122 @@ def push_unsubscribe(
         ).delete(synchronize_session=False)
         db.commit()
     return {"message": "unsubscribed"}
+
+
+@app.post("/users/me/withdraw")
+def withdraw_user(
+    request: Request,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """退会（アカウントの削除）。
+
+    利用規約・プライバシーポリシーで約束している「退会」を実現する。
+    本人確認のため、パスワードの再入力を求める（ログイン中の端末を
+    他人に触られても、それだけでは消せないようにするため）。
+
+    消すもの: 本人の学習記録・参考書・種・投稿・スタンプ・通知の宛先・
+    通知予約・セッション、そして本人のアカウントそのもの。
+    本人の投稿に他の人が付けたスタンプも、投稿と一緒に消える。
+    抜けたあとのチームは、残った人のために3人に整え直す。
+    """
+    password = data.get("password") or ""
+    check_login_rate(request, current_user.email)
+    if not password or not bcrypt.checkpw(
+        password.encode("utf-8"), current_user.hashed_password.encode("utf-8")
+    ):
+        record_login_failure(request, current_user.email)
+        # 401 は画面側で「ログイン切れ」として扱われ、強制ログアウトになるため 400 で返す
+        raise HTTPException(status_code=400, detail="パスワードが違います")
+    clear_login_failures(request, current_user.email)
+
+    uid = current_user.id
+    group_id = current_user.group_id
+
+    # 外部キーでつながっているものから順に消す（親を先に消すと失敗するため）
+    my_message_ids = [mid for (mid,) in db.query(Message.id).filter(Message.user_id == uid)]
+    if my_message_ids:
+        db.query(Reaction).filter(Reaction.message_id.in_(my_message_ids)).delete(
+            synchronize_session=False)
+    db.query(Reaction).filter(Reaction.user_id == uid).delete(synchronize_session=False)
+    db.query(Message).filter(Message.user_id == uid).delete(synchronize_session=False)
+    db.query(Report).filter(Report.user_id == uid).delete(synchronize_session=False)
+    db.query(Book).filter(Book.user_id == uid).delete(synchronize_session=False)
+    db.query(DailyGoal).filter(DailyGoal.user_id == uid).delete(synchronize_session=False)
+    db.query(PushSubscription).filter(PushSubscription.user_id == uid).delete(
+        synchronize_session=False)
+    db.query(PomodoroAlarm).filter(PomodoroAlarm.user_id == uid).delete(
+        synchronize_session=False)
+    db.query(AuthToken).filter(AuthToken.user_id == uid).delete(synchronize_session=False)
+    db.delete(current_user)
+    db.commit()
+
+    # 残ったチームを整える。人間が残っていれば3人に補い、
+    # AIだけになったら解散させる（AIだけのチームに意味はないため）。
+    if group_id:
+        grp = db.query(Group).filter(Group.id == group_id).first()
+        if grp:
+            humans = db.query(User).filter(
+                User.group_id == group_id, User.is_ai == False).count()  # noqa: E712
+            if humans > 0:
+                adjust_group_members(db, group_id, grp.goal)
+            else:
+                cleanup_ai_only_groups(db)
+    return {"message": "withdrawn"}
+
+
+@app.post("/juku/join")
+def join_juku(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """塾コードを入力して塾に所属する。
+
+    所属すると、次のチーム編成から「同じ塾の生徒」だけで組まれる。
+    すでにチームがある場合は、いったん外れて塾内で組み直す。
+    """
+    code = (data.get("code") or "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="塾コードを入力してください")
+    juku = db.query(Juku).filter(Juku.code == code).first()
+    if not juku:
+        raise HTTPException(status_code=404, detail="その塾コードは見つかりませんでした")
+    if current_user.juku_id == juku.id:
+        return {"message": "already joined", "juku_name": juku.name}
+
+    old_group_id = current_user.group_id
+    current_user.juku_id = juku.id
+    current_user.group_id = None
+    db.commit()
+    # 抜けたあとの元グループの人数を整える
+    if old_group_id:
+        old = db.query(Group).filter(Group.id == old_group_id).first()
+        if old:
+            adjust_group_members(db, old.id, old.goal)
+    assign_group_logic(db, current_user)
+    return {"message": "joined", "juku_name": juku.name}
+
+
+@app.post("/juku/leave")
+def leave_juku(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """塾への共有をやめる。学習記録は本人のものとして残る。"""
+    if not current_user.juku_id:
+        return {"message": "not joined"}
+    old_group_id = current_user.group_id
+    current_user.juku_id = None
+    current_user.group_id = None
+    db.commit()
+    if old_group_id:
+        old = db.query(Group).filter(Group.id == old_group_id).first()
+        if old:
+            adjust_group_members(db, old.id, old.goal)
+    assign_group_logic(db, current_user)
+    return {"message": "left"}
 
 
 @app.post("/pomodoro/alarm")
@@ -1754,11 +2159,29 @@ async def submit_report(
     # 認証: 学習記録は必ずログイン中ユーザー本人のものとして登録する。
     # リクエストボディの user_id は信用せず、トークンから特定した本人を使う。
     user = current_user
+
+    # 入力検証: APIを直接叩かれた場合に備え、欠落・型違い・範囲外を弾く。
+    # 検証しないと、マイナスや極端な分数がそのまま記録され、
+    # 森の成長・グラフ・芝生といった集計がすべて壊れる。
+    content = (report_data.get("content") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="学習内容を入力してください")
+    if len(content) > 500:
+        raise HTTPException(status_code=400, detail="学習内容は500文字以内にしてください")
+    minutes = report_data.get("study_minutes")
+    if isinstance(minutes, bool) or not isinstance(minutes, (int, float)):
+        raise HTTPException(status_code=400, detail="学習時間を数値で入力してください")
+    minutes = int(minutes)
+    if not (1 <= minutes <= 1440):
+        raise HTTPException(
+            status_code=400, detail="学習時間は1〜1440分の範囲で入力してください"
+        )
+
     r = Report(
         user_id=user.id,
         book_id=report_data.get("book_id"),
-        content=report_data["content"],
-        study_minutes=report_data["study_minutes"],
+        content=content,
+        study_minutes=minutes,
     )
     db.add(r)
     user.strike_count = 0
@@ -1768,7 +2191,7 @@ async def submit_report(
         msg = Message(
             group_id=user.group_id,
             user_id=user.id,
-            content=f"【学習記録】{report_data['content']} ({report_data['study_minutes']}分)",
+            content=f"【学習記録】{content} ({minutes}分)",
         )
         db.add(msg)
         db.commit()
@@ -1829,7 +2252,10 @@ def get_reports(
             "book_id": r.book_id,
             "content": r.content,
             "study_minutes": r.study_minutes,
-            "reported_at": r.reported_at.isoformat(),
+            # UTCであることを明示して返す（+00:00 付き）。印がないと、
+            # ブラウザが日本時間だと勘違いして9時間ずれた時刻を表示する。
+            # 秒までに丸めるのは、古いSafariが小数点以下6桁を読めないため。
+            "reported_at": r.reported_at.replace(tzinfo=timezone.utc, microsecond=0).isoformat(),
         }
         for r in reports
     ]

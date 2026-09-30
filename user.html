@@ -1713,6 +1713,23 @@
             tester: "開拓者",
             graduate: "開花"
         };
+        // メンバーのアイコン（プロフィール画像がない場合）。
+        // 全員同じ「人」の印にして、学習量などで差をつけない。AIだけは区別がつく印にする。
+        function memberIconSvg(kind, size) {
+            const s = size || 28;
+            const isAi = kind === 'ai' || kind === '🤖';
+            const path = isAi
+                // Lucide: bot
+                ? '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>'
+                // Lucide: user-round
+                : '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>';
+            const bg = isAi ? 'var(--border-soft)' : 'var(--soft)';
+            const fg = isAi ? 'var(--text-sub2)' : 'var(--heading)';
+            const box = Math.round(s * 1.6);
+            return `<div style="width:${box}px; height:${box}px; margin:0 auto; border-radius:50%; background:${bg}; color:${fg}; display:flex; align-items:center; justify-content:center;">`
+                + `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg></div>`;
+        }
+
         // メンバーオブジェクトから、持っているバッジのキー配列を返す
         function getMemberBadges(m) {
             const list = [];
@@ -1730,7 +1747,7 @@
             if (!m) return;
             const iconHtml = m.profile_image
                 ? `<img src="${escapeHtml(m.profile_image)}" alt="${escapeHtml(m.name || '')}のプロフィール画像" style="width:72px; height:72px; border-radius:50%; object-fit:cover;">`
-                : `<div style="font-size:56px;">${escapeHtml(m.icon)}</div>`;
+                : memberIconSvg(m.icon, 44);
             document.getElementById('memberDetailIcon').innerHTML = iconHtml;
             document.getElementById('memberDetailName').innerText = m.name;
             document.getElementById('memberDetailMinutes').innerText = `これまでの学習: ${m.minutes}分`;
@@ -1843,6 +1860,25 @@
         // reported_at等はDB上UTCで保存されているため、日付の境界(その日の0時)を
         // 日本時間で判定するには +9時間してから日付を取り出す必要がある。
         // 例: UTC 2026-06-14T16:30(=JST 6/15 01:30)は「6/15」として扱う。
+        // ===== 登録経路の記録（広告の効果測定） =====
+        // 広告のURLに ?src=印 を付けておくと、最初に来たときの印を端末に覚えておき、
+        // 登録したときにだけサーバーへ送る。印はURLから消しておく
+        // （そのURLを誰かに共有されたとき、広告経由と誤って数えないため）。
+        (function captureSignupSource() {
+            try {
+                const params = new URLSearchParams(location.search);
+                const src = params.get('src') || params.get('utm_source');
+                if (src && /^[A-Za-z0-9_.\-]{1,64}$/.test(src) && !localStorage.getItem('minsta_src')) {
+                    localStorage.setItem('minsta_src', src);
+                }
+                if (params.has('src') || params.has('utm_source')) {
+                    params.delete('src'); params.delete('utm_source');
+                    const q = params.toString();
+                    history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+                }
+            } catch (e) { }
+        })();
+
         // サーバーから来た日時文字列を、UTCとして正しく読む共通関数。
         // 末尾にZや+00:00が無い古い形式でもUTCとみなす（無印のままだと
         // ブラウザは端末の現地時刻として読み、9時間ずれるため）。
@@ -3083,13 +3119,15 @@
                 const res = await fetch(`${API_URL}/users/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, name, goal, target_date: date || null })
+                    body: JSON.stringify({ email, password, name, goal, target_date: date || null,
+                        src: (function () { try { return localStorage.getItem('minsta_src') || undefined; } catch (e) { return undefined; } })() })
                 });
 
                 if (!res.ok) throw new Error("すでに登録されているメールアドレスか、エラーが発生しました。");
 
                 const data = await res.json();
                 justRegistered = true; // 初回オンボーディング表示のためのフラグ
+                try { localStorage.removeItem('minsta_src'); } catch (e) { } // 記録済みなので消す
                 alert(`🌱 登録完了！\n\nあなたのユーザーIDは【 ${data.user.id} 】です！\nようこそ、みんスタへ！`);
 
                 document.getElementById('loginEmail').value = email;
@@ -4168,7 +4206,7 @@
                     document.getElementById('groupMembers').innerHTML = members.map((m, idx) => {
                         let iconHtml = m.profile_image
                             ? `<img src="${escapeHtml(m.profile_image)}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
-                            : `<div style="font-size: 28px;">${escapeHtml(m.icon)}</div>`;
+                            : memberIconSvg(m.icon, 22);
                         // カード内に、持っているバッジを小さく重ねて表示
                         const badges = getMemberBadges(m);
                         let badgeHtml = "";

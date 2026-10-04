@@ -1226,7 +1226,7 @@ def get_privacy():
 
 SW_JS = r"""// キャッシュの名前。アプリを更新したらこの数字を上げる。
 // 名前が変わると古いキャッシュは activate 時に捨てられ、次回アクセスで新しい版を取り直す。
-var CACHE = 'minsta-v1';
+var CACHE = 'minsta-v2';
 
 self.addEventListener('install', function (event) {
     // アプリ本体を先に取っておく。失敗してもインストールは止めない（圏外での初回登録など）。
@@ -1254,8 +1254,11 @@ self.addEventListener('fetch', function (event) {
     // 取得だけを扱う。送信(POST等)や外部サイトへの通信には手を出さない。
     if (req.method !== 'GET') return;
     if (new URL(req.url).origin !== self.location.origin) return;
-    // APIの応答は毎回新しいものが必要なのでキャッシュしない。
-    if (/\/(users|reports|groups|books|messages|daily-goals|push|pomodoro|api)\//.test(req.url)) return;
+    // キャッシュしてよいのは、中身が変わらない部品だけ。
+    // 以前は「APIのパスを除外する」書き方にしていたが、/daily-goals のように
+    // 末尾にスラッシュが続かないAPIが除外から漏れ、古い応答が返る不具合が出た。
+    // 取りこぼしが起きないよう、許可するものを並べる方式にする。
+    var CACHEABLE = /\/(manifest\.json|sw\.js|icon-\d+\.png|favicon\.ico)(\?|$)/;
 
     // 画面の読み込みは「まずネット、繋がらなければキャッシュ」。
     // こうしておくと、更新は普通に反映され、圏外のときだけ保存した版が出る。
@@ -1277,7 +1280,10 @@ self.addEventListener('fetch', function (event) {
         return;
     }
 
-    // アイコンなどの部品は「あればキャッシュ、なければネット」。
+    // アイコンなどの部品だけ「あればキャッシュ、なければネット」。
+    // それ以外（APIを含む）は、そのままネットへ通す。
+    if (!CACHEABLE.test(req.url)) return;
+
     event.respondWith(
         caches.match(req).then(function (hit) {
             return hit || fetch(req).then(function (res) {

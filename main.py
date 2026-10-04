@@ -1224,76 +1224,25 @@ def get_privacy():
     return HTMLResponse(_legal_page("プライバシーポリシー", PRIVACY_BODY_HTML))
 
 
-SW_JS = r"""// キャッシュの名前。アプリを更新したらこの数字を上げる。
-// 名前が変わると古いキャッシュは activate 時に捨てられ、次回アクセスで新しい版を取り直す。
-var CACHE = 'minsta-v2';
+SW_JS = r"""// Service Worker。
+// 役割はプッシュ通知の受け取りだけにしてある。
+// 以前はオフライン表示のために通信を横取りしていたが、APIの応答まで
+// キャッシュしてしまい「種をまいても一覧に出ない」不具合を起こしたため撤去した。
+// オフライン対応が必要になったら、取り違えの起きない形で作り直す。
 
 self.addEventListener('install', function (event) {
-    // アプリ本体を先に取っておく。失敗してもインストールは止めない（圏外での初回登録など）。
-    event.waitUntil(
-        caches.open(CACHE).then(function (cache) {
-            return cache.addAll(['/', '/manifest.json', '/icon-192.png?v=2']);
-        }).catch(function () { })
-    );
     self.skipWaiting();
 });
 
 self.addEventListener('activate', function (event) {
-    // 名前が変わった古いキャッシュを削除する。これをしないと更新が反映されない。
+    // 以前の版が残したキャッシュを全部捨てる（古い応答が返るのを止める）
     event.waitUntil(
         caches.keys().then(function (names) {
-            return Promise.all(names.map(function (n) {
-                return n === CACHE ? null : caches.delete(n);
-            }));
+            return Promise.all(names.map(function (n) { return caches.delete(n); }));
         }).then(function () { return self.clients.claim(); })
     );
 });
 
-self.addEventListener('fetch', function (event) {
-    var req = event.request;
-    // 取得だけを扱う。送信(POST等)や外部サイトへの通信には手を出さない。
-    if (req.method !== 'GET') return;
-    if (new URL(req.url).origin !== self.location.origin) return;
-    // キャッシュしてよいのは、中身が変わらない部品だけ。
-    // 以前は「APIのパスを除外する」書き方にしていたが、/daily-goals のように
-    // 末尾にスラッシュが続かないAPIが除外から漏れ、古い応答が返る不具合が出た。
-    // 取りこぼしが起きないよう、許可するものを並べる方式にする。
-    var CACHEABLE = /\/(manifest\.json|sw\.js|icon-\d+\.png|favicon\.ico)(\?|$)/;
-
-    // 画面の読み込みは「まずネット、繋がらなければキャッシュ」。
-    // こうしておくと、更新は普通に反映され、圏外のときだけ保存した版が出る。
-    if (req.mode === 'navigate') {
-        event.respondWith(
-            fetch(req).then(function (res) {
-                var copy = res.clone();
-                caches.open(CACHE).then(function (c) { c.put('/', copy); }).catch(function () { });
-                return res;
-            }).catch(function () {
-                return caches.match('/').then(function (hit) {
-                    return hit || new Response(
-                        '<meta charset="utf-8"><p>オフラインです。通信が戻ると開けます。</p>',
-                        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-                    );
-                });
-            })
-        );
-        return;
-    }
-
-    // アイコンなどの部品だけ「あればキャッシュ、なければネット」。
-    // それ以外（APIを含む）は、そのままネットへ通す。
-    if (!CACHEABLE.test(req.url)) return;
-
-    event.respondWith(
-        caches.match(req).then(function (hit) {
-            return hit || fetch(req).then(function (res) {
-                var copy = res.clone();
-                caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () { });
-                return res;
-            });
-        }).catch(function () { return fetch(req); })
-    );
-});
 // push 通知の受信時にシステム通知を表示する
 self.addEventListener('push', function (event) {
     var data = {};

@@ -2460,7 +2460,18 @@
         window.onload = async () => {
             initDarkMode();
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed', err));
+                // 以前の版が通信を横取りしてAPIの応答までキャッシュし、
+                // 「種をまいても一覧に出ない」不具合を起こした。
+                // 端末に古い版が残っていても確実に入れ替わるよう、毎回更新を促し、
+                // 残っているキャッシュも消しておく。
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => reg.update())
+                    .catch(err => console.log('SW registration failed', err));
+                if (window.caches && caches.keys) {
+                    caches.keys()
+                        .then(names => Promise.all(names.map(n => caches.delete(n))))
+                        .catch(() => { });
+                }
             }
 
             setupDelegatedEvents();

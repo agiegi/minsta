@@ -119,13 +119,30 @@
             letter-spacing: 2px;
         }
 
-        .subtitle {
-            text-align: center;
-            color: var(--text-sub);
-            font-size: 12px;
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-style: italic;
+        /* ヘッダーのロゴ。画像に「みんスタ」と副題の両方が入っている。
+           高さだけ決めて、幅は contain に合わせる（画面が狭いときは自動で縮む）。
+           読み上げ用に、見た目には出さない文字を中に置いている。 */
+        h1.app-logo {
+            height: 76px;
+            margin: 0 auto 20px;
+            background: url("/logo.webp?v=1") center / contain no-repeat;
+        }
+
+        body.dark h1.app-logo {
+            background-image: url("/logo-dark.webp?v=1");
+        }
+
+        /* 画面には出さないが、読み上げには伝わる文字 */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            padding: 0;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+            border: 0;
         }
 
         .card {
@@ -643,8 +660,7 @@
         }
         /* ===== ログイン前の紹介画面 ===== */
         /* 紹介画面の表示中は共通ヘッダーを隠し、器のカード感も消して1枚のLPに見せる */
-        .app-container.intro-mode > h1,
-        .app-container.intro-mode > .subtitle {
+        .app-container.intro-mode > h1 {
             display: none;
         }
 
@@ -957,8 +973,9 @@
     <div id="reportToast" role="status" aria-live="polite">🌱 報告しました！</div>
 
     <div class="app-container intro-mode">
-        <h1>🌱 みんスタ</h1>
-        <p class="subtitle">〜 みんなで育てる学習の森 〜</p>
+        <h1 class="app-logo">
+            <span class="sr-only">みんスタ ― みんなで育てる学習の森</span>
+        </h1>
 
         <div id="authScreen" class="card">
             <div id="introForm">

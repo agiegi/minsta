@@ -163,6 +163,34 @@
             text-decoration: underline;
         }
 
+        /* Googleでログインする行。
+           サーバーが「使える」と答えたときだけJSが表示する（既定は隠す）。
+           クライアントIDが未設定なら、ここは最後まで出てこない。 */
+        .google-row { display: none; margin: 2px 0 0; }
+
+        .google-slot {
+            display: flex;
+            justify-content: center;
+            min-height: 44px;   /* ボタンが描かれる前に高さが跳ねないように */
+        }
+
+        .or-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0 14px;
+            color: var(--text-sub2);
+            font-size: 12px;
+        }
+
+        .or-line::before,
+        .or-line::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
         .toggle-link:hover {
             color: var(--text-sub);
         }
@@ -1307,6 +1335,10 @@
 
             <div id="loginForm" style="display: none;">
                 <h3 style="text-align:center; margin-top:0;">おかえりなさい</h3>
+                <div class="google-row">
+                    <div id="googleBtnLogin" class="google-slot"></div>
+                    <div class="or-line"><span>または</span></div>
+                </div>
                 <input type="email" id="loginEmail" placeholder="メールアドレス">
                 <input type="password" id="loginPassword" placeholder="パスワード">
                 <button onclick="login()">ログイン</button>
@@ -1315,13 +1347,30 @@
             </div>
 
             <div id="registerForm" style="display: none;">
-                <h3 style="text-align:center; margin-top:0;">はじめまして</h3>
-                <input type="email" id="regEmail" placeholder="メールアドレス">
-                <input type="password" id="regPassword" placeholder="パスワード（半角英数）">
+                <h3 id="regTitle" style="text-align:center; margin-top:0;">はじめまして</h3>
 
+                <!-- Googleで来た人には、ここはGoogle側で済んでいるのでJSが隠す -->
+                <div id="regPwFields">
+                    <div class="google-row">
+                        <div id="googleBtnRegister" class="google-slot"></div>
+                        <div class="or-line"><span>または</span></div>
+                    </div>
+                    <input type="email" id="regEmail" placeholder="メールアドレス">
+                    <input type="password" id="regPassword" placeholder="パスワード（半角英数）">
+                </div>
+
+                <!-- Googleで来た人にだけ出す案内。見出しが「あと2つだけ」なので、ここでは繰り返さない -->
+                <p id="regGoogleNote"
+                    style="display:none; font-size:12.5px; color:var(--text-sub); line-height:1.7; text-align:center; margin:0;">
+                    Googleのアカウントで続けます。</p>
+
+                <input type="text" id="regName" placeholder="お名前" style="margin-top:15px;">
+                <!-- 規約第4条4項で本名を使わないよう勧めている。入力のそばに書いておく -->
+                <p style="font-size:11.5px; color:var(--text-sub2); line-height:1.6; text-align:left; margin:3px 0 0 5px;">
+                    チームメイトに表示されます。本名でなくて構いません。</p>
+                <!-- 目標についての案内。目標の欄のすぐ上に置く（以前は名前の欄の上にあった） -->
                 <p style="font-size: 12px; color: var(--text-sub2); text-align: center; margin-top: 15px;">目標を入力するか、一覧から検索・選択してください。
                 </p>
-                <input type="text" id="regName" placeholder="お名前">
                 <input type="text" id="regGoal" placeholder="🔍 学習の目標を入力" oninput="filterTags()">
 
                 <div class="goal-tags-container" id="tagsContainer">
@@ -1503,7 +1552,7 @@
                     </label>
                 </div>
 
-                <button onclick="register()"
+                <button onclick="submitRegister()"
                     style="background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%);">森の住人になる</button>
                 <p class="toggle-link" onclick="toggleAuthMode()">▶ すでにIDをお持ちの方（ログイン）</p>
                 <p class="toggle-link" onclick="backToIntro()">← もどる</p>
@@ -1834,7 +1883,17 @@
             </ul>
             <p style="font-size:12px; color:var(--text-sub2); line-height:1.7; margin:0 0 12px;">
                 チームの他のメンバーの記録はそのまま残ります。一度ログアウトするだけなら、退会の必要はありません。</p>
-            <input type="password" id="withdrawPassword" placeholder="確認のため、パスワードを入力" autocomplete="current-password">
+            <!-- 本人確認。持っている手段に合わせてJSがどちらかを出す。
+                 パスワードを持たない人（Googleだけで登録した人）にパスワードを求めると、
+                 退会できなくなってしまう -->
+            <div id="withdrawByPassword">
+                <input type="password" id="withdrawPassword" placeholder="確認のため、パスワードを入力" autocomplete="current-password">
+            </div>
+            <div id="withdrawByGoogle" style="display:none;">
+                <p style="font-size:12.5px; color:var(--text-sub); line-height:1.7; margin:0 0 10px; text-align:center;">
+                    確認のため、もう一度Googleで認証してください。</p>
+                <div id="googleBtnWithdraw" class="google-slot"></div>
+            </div>
             <p id="withdrawError" style="font-size:12px; color:var(--danger-text); margin:4px 0 0; min-height:1em;"></p>
             <button id="withdrawBtn" onclick="submitWithdraw()"
                 style="width:100%; margin:10px 0 0; background:var(--danger-btn); color:#fff; box-shadow:none;">退会する</button>
@@ -1984,6 +2043,9 @@
     <script>
         const API_URL = '';
         let justRegistered = false; // 登録直後の初回ガイド表示用
+        // パスワードを持っているか。退会の確認でどちらを聞くかに使う。
+        // 分からないうちはパスワードを持っている側に寄せる（従来の動き）。
+        let myHasPassword = true;
         let currentUserId = null, currentUserName = "", currentGroupId = null, currentTargetDate = null, currentGoal = "";
         // 称号バッジ画像（base64埋め込み。開発者=大樹/アドバイザー=雫/テスター=双葉/達成=桜）
         const BADGE_IMAGES = {
@@ -3364,9 +3426,150 @@
         }
 
         function toggleAuthMode() {
+            setGoogleMode(false);
             const loginDiv = document.getElementById('loginForm'), regDiv = document.getElementById('registerForm');
             loginDiv.style.display = loginDiv.style.display === 'none' ? 'block' : 'none';
             regDiv.style.display = regDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // ===== Googleでログイン =====
+        // 画面にボタンを出すのは、サーバーが「使える」と答えたときだけ。
+        // 未設定のときはGoogleのスクリプトも読み込まない（使わない相手に通信しない）。
+        let googleCredential = null;   // IDトークン。資格情報なので localStorage には入れない
+        let googleMode = false;        // Googleで来た新規の人が、目標と名前を入れている最中
+        let googlePurpose = 'login';   // 'login' か 'withdraw'。押された用途を見分ける
+        let googleReady = false;
+
+        (function setupGoogleLogin() {
+            fetch(`${API_URL}/auth/google/client-id`)
+                .then(r => r.ok ? r.json() : null)
+                .then(cfg => {
+                    if (!cfg || !cfg.enabled || !cfg.client_id) return;
+                    const s = document.createElement('script');
+                    s.src = 'https://accounts.google.com/gsi/client';
+                    s.async = true;
+                    s.defer = true;
+                    s.onload = () => initGoogleLogin(cfg.client_id);
+                    document.head.appendChild(s);
+                })
+                .catch(() => { });   // 使えないだけ。アプリは普通に動く
+        })();
+
+        function initGoogleLogin(clientId) {
+            if (!window.google || !google.accounts || !google.accounts.id) return;
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: onGoogleCredential,
+                auto_select: false,
+            });
+            googleReady = true;
+            renderGoogleButton('googleBtnLogin', 'signin_with');
+            renderGoogleButton('googleBtnRegister', 'signup_with');
+        }
+
+        // Googleの用意した本物のボタンを描く（見た目の決まりがあるため自作しない）。
+        function renderGoogleButton(slotId, text) {
+            if (!googleReady) return false;
+            const el = document.getElementById(slotId);
+            if (!el) return false;
+            el.innerHTML = '';
+            // 暗いテーマでは黒地のほうが収まりがよい
+            const theme = document.body.classList.contains('dark') ? 'filled_black' : 'outline';
+            google.accounts.id.renderButton(el, {
+                theme: theme, size: 'large', shape: 'pill',
+                text: text, locale: 'ja', width: 280,
+            });
+            const row = el.closest('.google-row');
+            if (row) row.style.display = 'block';
+            return true;
+        }
+
+        function onGoogleCredential(response) {
+            if (!response || !response.credential) return;
+            // 退会の確認で押された場合は、ログインではなく退会に進む
+            if (googlePurpose === 'withdraw') {
+                googlePurpose = 'login';
+                submitWithdraw(response.credential);
+                return;
+            }
+            googleCredential = response.credential;
+            sendGoogleCredential();
+        }
+
+        // Googleの認証情報をサーバーへ送る。
+        // 新規の人は1回目で「目標と名前が要る」と返ってくるので、
+        // 同じ認証情報に目標と名前を添えて、もう一度送る。
+        async function sendGoogleCredential(extra) {
+            const body = Object.assign({
+                credential: googleCredential,
+                src: (function () { try { return localStorage.getItem('minsta_src') || undefined; } catch (e) { return undefined; } })()
+            }, extra || {});
+            let res, data;
+            try {
+                res = await fetch(`${API_URL}/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                data = await res.json().catch(() => ({}));
+            } catch (e) {
+                alert('通信に失敗しました。通信状況を確認してお試しください');
+                return;
+            }
+            if (!res.ok) {
+                alert(data.detail || 'Googleでのログインに失敗しました');
+                return;
+            }
+            if (data.status === 'need_goal') {
+                showGoogleGoalStep();
+                return;
+            }
+            if (data.is_new) {
+                justRegistered = true;   // 初回オンボーディング表示のためのフラグ
+                try { localStorage.removeItem('minsta_src'); } catch (e) { }
+                alert(`🌱 登録完了！\n\nあなたのユーザーIDは【 ${data.user.id} 】です！\nようこそ、みんスタへ！`);
+            }
+            googleCredential = null;   // 用が済んだ資格情報は持ち続けない
+            setGoogleMode(false);
+            await enterApp(data);
+        }
+
+        // Googleで来た新規の人に、目標と名前だけを聞く。
+        // 登録画面を使い回す（目標の一覧をもう一組作らずに済む）。
+        function showGoogleGoalStep() {
+            goAuth('register');
+            setGoogleMode(true);
+        }
+
+        function setGoogleMode(on) {
+            googleMode = on;
+            const pw = document.getElementById('regPwFields');
+            const note = document.getElementById('regGoogleNote');
+            const title = document.getElementById('regTitle');
+            if (pw) pw.style.display = on ? 'none' : 'block';
+            if (note) note.style.display = on ? 'block' : 'none';
+            if (title) title.innerText = on ? 'あと2つだけ' : 'はじめまして';
+        }
+
+        // 登録ボタンの振り分け。Googleで来た人はパスワードを持たない。
+        function submitRegister() {
+            if (googleMode) return registerWithGoogle();
+            return register();
+        }
+
+        async function registerWithGoogle() {
+            const name = document.getElementById('regName').value.trim();
+            const goal = document.getElementById('regGoal').value.trim();
+            const date = document.getElementById('regDate').value;
+            if (!name || !goal) return alert('お名前と目標を入力してください');
+            if (!document.getElementById('regAgree').checked) {
+                return alert('利用規約とプライバシーポリシーへの同意が必要です');
+            }
+            // IDトークンは1時間ほどで切れる。放置されていたら取り直してもらう。
+            if (!googleCredential) {
+                return alert('Googleの確認の有効期限が切れました。もう一度「Googleではじめる」からお試しください');
+            }
+            await sendGoogleCredential({ name, goal, target_date: date || null });
         }
 
         // 紹介画面の端末の中で、実際のアプリ画面を順に見せる。
@@ -3418,6 +3621,7 @@
         // 導入画面から ログイン / 新規登録 へ進む。初見の人にはまずアプリ紹介を見せる。
         function goAuth(target) {
             setIntroMode(false);
+            setGoogleMode(false);   // 画面を移ったらGoogleの続き中という状態は解く
             document.getElementById('introForm').style.display = 'none';
             document.getElementById('loginForm').style.display = target === 'login' ? 'block' : 'none';
             document.getElementById('registerForm').style.display = target === 'register' ? 'block' : 'none';
@@ -3426,6 +3630,7 @@
         // 導入画面へ戻る。
         function backToIntro() {
             setIntroMode(true);
+            setGoogleMode(false);
             document.getElementById('introForm').style.display = 'block';
             document.getElementById('loginForm').style.display = 'none';
             document.getElementById('registerForm').style.display = 'none';
@@ -3478,24 +3683,33 @@
                     body: JSON.stringify({ email, password })
                 });
 
-                if (!res.ok) throw new Error("メールアドレスかパスワードが間違っています。");
+                if (!res.ok) {
+                    const d = await res.json().catch(() => ({}));
+                    // Googleだけで登録した人には、入口が違うことを伝える
+                    throw new Error(d.detail || "メールアドレスかパスワードが間違っています。");
+                }
 
-                const data = await res.json();
-                // 認証: 発行されたトークンを保存し、以降の通信に使う。
-                authToken = data.token;
-                localStorage.setItem('minsta_token', authToken);
-                currentUserId = data.user.id;
-                document.getElementById('displayUserId').innerText = currentUserId;
-                setIntroMode(false);
-                document.getElementById('authScreen').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-
-                await fetchBooks();
-                await fetchData();
-
-                if (ws) ws.close();
-                connectWebSocket();
+                await enterApp(await res.json());
             } catch (e) { alert(e.message); }
+        }
+
+        // ログインが済んだあとの共通処理。
+        // パスワードとGoogleのどちらで入っても、ここから先は同じ。
+        async function enterApp(data) {
+            // 認証: 発行されたトークンを保存し、以降の通信に使う。
+            authToken = data.token;
+            localStorage.setItem('minsta_token', authToken);
+            currentUserId = data.user.id;
+            document.getElementById('displayUserId').innerText = currentUserId;
+            setIntroMode(false);
+            document.getElementById('authScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+
+            await fetchBooks();
+            await fetchData();
+
+            if (ws) ws.close();
+            connectWebSocket();
         }
 
         // 更新ボタン: ページ全体は再読み込みせず、表示データだけを取り直す。
@@ -3533,24 +3747,51 @@
         function openWithdrawModal() {
             document.getElementById('withdrawPassword').value = '';
             document.getElementById('withdrawError').innerText = '';
+            const byPw = document.getElementById('withdrawByPassword');
+            const byGoogle = document.getElementById('withdrawByGoogle');
+            const btn = document.getElementById('withdrawBtn');
+            // 本人確認の手段を、その人が持っているものに合わせる。
+            // パスワードを持たない人にパスワードを求めると、退会できなくなる。
+            if (myHasPassword) {
+                byPw.style.display = 'block';
+                byGoogle.style.display = 'none';
+                btn.style.display = 'block';
+            } else {
+                byPw.style.display = 'none';
+                byGoogle.style.display = 'block';
+                btn.style.display = 'none';   // Googleのボタンを押すと、そのまま退会に進む
+                googlePurpose = 'withdraw';
+                if (!renderGoogleButton('googleBtnWithdraw', 'continue_with')) {
+                    document.getElementById('withdrawError').innerText =
+                        'Googleでの確認がいま利用できません。お手数ですが ohgy.dev@gmail.com へご連絡ください';
+                }
+            }
             document.getElementById('withdrawModal').style.display = 'flex';
         }
 
         function closeWithdrawModal() {
+            googlePurpose = 'login';   // 用途を元に戻す
             document.getElementById('withdrawModal').style.display = 'none';
         }
 
-        async function submitWithdraw() {
-            const pw = document.getElementById('withdrawPassword').value;
+        // googleCred が渡されたときはGoogleでの確認、無ければパスワードでの確認。
+        async function submitWithdraw(googleCred) {
             const err = document.getElementById('withdrawError');
             const btn = document.getElementById('withdrawBtn');
-            if (!pw) { err.innerText = 'パスワードを入力してください'; return; }
+            const body = {};
+            if (googleCred) {
+                body.credential = googleCred;
+            } else {
+                const pw = document.getElementById('withdrawPassword').value;
+                if (!pw) { err.innerText = 'パスワードを入力してください'; return; }
+                body.password = pw;
+            }
             if (!confirm('本当に退会しますか？記録はすべて消え、元に戻せません。')) return;
             btn.disabled = true; btn.innerText = '処理中...';
             try {
                 const res = await apiFetch('/users/me/withdraw', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pw })
+                    body: JSON.stringify(body)
                 });
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
@@ -4405,6 +4646,7 @@
             currentGroupId = me.group_id;
             currentTargetDate = me.target_date;
             currentGoal = me.goal;
+            myHasPassword = me.has_password !== false;   // 退会の確認の分岐に使う
 
             if (oldGroupId !== currentGroupId && ws) {
                 ws.close();

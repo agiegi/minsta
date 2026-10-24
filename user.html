@@ -366,6 +366,7 @@
             color: var(--text);
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;            /* 標準の書き方。古いブラウザは上の -webkit- を見る */
             -webkit-box-orient: vertical;
             overflow: hidden;
             line-height: 1.3;
@@ -4115,7 +4116,7 @@
                         resultsDiv.innerHTML += `
                         <div class="book-item-small" data-action="add-searched-book" data-title="${escapeHtml(rawTitle)}" data-thumb="${escapeHtml(thumb)}">
                             <img src="${escapeHtml(thumb)}" alt="" class="book-img-small">
-                            <div style="font-size: 11px; line-height: 1.2; margin-top: 4px; color: var(--text-sub); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(rawTitle)}</div>
+                            <div style="font-size: 11px; line-height: 1.2; margin-top: 4px; color: var(--text-sub); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(rawTitle)}</div>
                         </div>`;
                     });
 
@@ -4372,10 +4373,15 @@
                 mins = Math.max(1, Math.floor(((25 * 60) - currentSecondsDisplay) / 60));
             }
             document.getElementById('studyMinutes').value = mins;
-            const btn = document.getElementById('pauseBtn');
-            btn.innerText = "再開する"; btn.style.background = "var(--accent)"; btn.style.color = "white";
-            btn.disabled = false; isPaused = true;
-            document.getElementById('startBtn').disabled = false; document.getElementById('pomoBtn').disabled = false; document.getElementById('stopBtn').disabled = true;
+            // 計測は終わったので、ボタンを「はじめる前」の状態に戻す。
+            //
+            // 以前はここで「再開する」を押せるまま残していた。しかし止めた時点の
+            // 経過時間は accumulatedSeconds に入っていない（一時停止を経由して
+            // いないため0のまま）ので、押すと0から数え直しになっていた。
+            // 「再開」と書いてあるのに続きにならないのが分かりにくかった。
+            // 25分完了時（handlePomodoroEnd）と同じ後始末にそろえる。
+            accumulatedSeconds = 0;
+            resetTimerButtons();
         }
 
         function resetTimerButtons() {

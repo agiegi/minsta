@@ -439,7 +439,12 @@ def need_date(value, label):
 # ===== ログイン試行の制限（総当たり対策） =====
 # 外部ライブラリを増やさず、メモリ上で数えるだけの簡易版。
 # サーバーを再起動すると記録は消えるが、短時間に何千回と試す攻撃は防げる。
-LOGIN_MAX_FAILURES = 5          # 何回失敗したらロックするか
+# メール単位とIP単位で上限を分けている。
+# 総当たり対策の本体は「同じメールアドレスへの5回」なので、そこは締めたまま。
+# IP単位を緩くするのは、塾の教室のように1つの回線を大勢で使う場面があるため。
+# 誰かが5回間違えただけで、その場の全員がログインできなくなるのを避ける。
+LOGIN_MAX_FAILURES_MAIL = int(os.environ.get("LOGIN_MAX_FAILURES_MAIL", "5"))
+LOGIN_MAX_FAILURES_IP = int(os.environ.get("LOGIN_MAX_FAILURES_IP", "50"))
 LOGIN_WINDOW_SECONDS = 300      # 失敗を数える時間の幅（5分）
 LOGIN_LOCK_SECONDS = 900        # ロックする時間（15分）
 
@@ -461,6 +466,13 @@ def _ip_key(request: Request) -> str:
     return f"ip:{ip}"
 
 
+def _max_failures_for(key: str) -> int:
+    """鍵の種類ごとの上限を返す。メール単位だけ締める。"""
+    if key.startswith("mail:"):
+        return LOGIN_MAX_FAILURES_MAIL
+    return LOGIN_MAX_FAILURES_IP
+
+
 def _check_failure_keys(keys: List[str]):
     """与えられた鍵のどれかで失敗が続いているならロックする。"""
     now = utcnow()
@@ -473,7 +485,7 @@ def _check_failure_keys(keys: List[str]):
         in_window = [
             t for t in recent if (now - t).total_seconds() < LOGIN_WINDOW_SECONDS
         ]
-        if len(in_window) >= LOGIN_MAX_FAILURES:
+        if len(in_window) >= _max_failures_for(key):
             raise HTTPException(
                 status_code=429,
                 detail="ログインの試行が続いたため、しばらく受け付けられません。時間をおいて再度お試しください",
@@ -513,7 +525,7 @@ def record_ip_failure(request: Request):
 # 上限が無いと、自動で何千個もアカウントを作られ、チームとAIメンバーが際限なく増える。
 # 塾で生徒がまとめて登録する場面があるので、1クラス分は通る広さにしてある。
 # 足りなければ Render の環境変数 REGISTER_MAX_PER_HOUR で変えられる。
-REGISTER_MAX_PER_HOUR = int(os.environ.get("REGISTER_MAX_PER_HOUR", "30"))
+REGISTER_MAX_PER_HOUR = int(os.environ.get("REGISTER_MAX_PER_HOUR", "100"))
 REGISTER_WINDOW_SECONDS = 3600
 
 _register_times: Dict[str, List[datetime]] = {}
